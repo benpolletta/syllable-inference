@@ -50,7 +50,7 @@ for s = 1:length(SI)
     
     %% Retrieving phonemes and their start and end times.
     
-    phone_filename = [sentence_dir, file_name, '.PHN'];
+    phone_filename = [timit_dir, file_name, '.PHN'];
     fid = fopen(phone_filename, 'r');
     phone_data = textscan(fid, '%s');
     fclose(fid);
@@ -67,7 +67,7 @@ for s = 1:length(SI)
     
     %% Retrieving & writing pronunciations.
 
-    pron_filename = [sentence_dir, file_name, '.WRDpron'];
+    pron_filename = [timit_dir, file_name, '.WRDpron'];
     fid = fopen(pron_filename, 'w');
 
     pronunciations = cell(size(word_lengths));
@@ -83,21 +83,21 @@ for s = 1:length(SI)
         format = join(repmat({'%s\t'}, 1, length(this_pronunciation)), '');
         format = [format{1}, '\n'];
 
-        fprintf(fid, format, this_pronunciation{:})
+        fprintf(fid, format, this_pronunciation{:});
         
     end
 
-    fclose(fid)
+    fclose(fid);
     
     %% Retrieving syllable boundary_times & normalizing word lengths.
     
-    sylb_filename = [sentence_dir, file_name, '.SYLB'];
-    fid = fopen(sylb_filename, 'r');
-    sylb_indices = textscan(fid, '%d %d %s');
+    tsylb_filename = [timit_dir, file_name, '.TSYLB'];
+    fid = fopen(tsylb_filename, 'r');
+    tsylb_indices = textscan(fid, '%d');
     fclose(fid);
-    sylb_indices = sylb_indices{1};
-    syllable_lengths = diff(sylb_indices/16);
-    mid_syl_indices = sylb_indices(1:(end - 1)) + diff(sylb_indices)/2;
+    tsylb_indices = tsylb_indices{1};
+    syllable_lengths = diff(tsylb_indices/16);
+    mid_syl_indices = tsylb_indices(1:(end - 1)) + diff(tsylb_indices)/2;
     
     norm_word_lengths = word_lengths/mean(syllable_lengths);
     
@@ -117,7 +117,7 @@ for s = 1:length(SI)
             
             syl_index = this_word_index(syl);
             
-            this_syl_indicator = any(phone_indices > sylb_indices(syl_index) & phone_indices < sylb_indices(syl_index + 1), 2);
+            this_syl_indicator = any(phone_indices > tsylb_indices(syl_index) & phone_indices < tsylb_indices(syl_index + 1), 2);
         
             syllables{syl} = phones(this_syl_indicator);
             
