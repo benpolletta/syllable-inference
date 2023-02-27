@@ -50,7 +50,7 @@ for w = 1:num_windows
     phone_stats(:, w) = tcdf(phone_tstat, window_length - 1, 'upper');
 
     norm_phone_stats = nanunitsum(phone_stats(:, w));
-    inv_entropy(w) = (log(num_phones) + sum(norm_phone_stats.*log(norm_phone_stats)))/num_phones;
+    inv_entropy(w) = (log(num_phones) + nansum(norm_phone_stats.*log(norm_phone_stats)))/num_phones;
 
     mu_f(:, w) = mean(this_feature_vec);
 %     mu_f_column = repmat(mu_f(:, w)', num_phones, 1);

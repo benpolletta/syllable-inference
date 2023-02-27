@@ -13,6 +13,7 @@ for f = 1:length(fields)
 end
 % likelihood_data = likelihood;
 % likelihood = likelihood.likelihood;
+num_phones = length(phones);
 
 phones2timit = cellfun(@(x) strcmpi(x, phones), stats.id, 'unif', 0);
 phones2timit_mat = cat(2, phones2timit{:});
@@ -21,7 +22,7 @@ trans2timit = cellfun(@(x) strcmpi(x, phones), stats.trans_phones, 'unif', 0);
 trans2timit_mat = cat(2, trans2timit{:});
 trans_prob = trans2timit_mat*stats.trans_prob*trans2timit_mat';
 
-[hazard, transition, trans_posterior] = deal(zeros(size(trans_likelihood)));
+[hazard, transition, trans_posterior, inv_entropy] = deal(zeros(size(trans_likelihood)));
 phone_posterior = nan(size(phone_likelihood));
 
 phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.prob);
@@ -52,6 +53,8 @@ for w = 2:length(time)
     % tp_derivative(w) = trans_likelihood(w)*
     trans_posterior(w) = trans_likelihood(w); %*hazard(w); % trans_posterior(w - 1)*hazard(w);
 
+    inv_entropy(w) = (log(num_phones) + nansum(phone_posterior(:, w).*log(phone_posterior(:, w))))/num_phones;
+
     pt_dist(:, w) = nanunitsum([phone_posterior(:, w); trans_posterior(w)]);
 
     if trans_posterior(w) > 0.9
@@ -60,7 +63,7 @@ for w = 2:length(time)
         last_transition_index = w;
         transition(w) = 1;
 
-        if transition(w - 1) = 0;
+        if ~transition(w - 1)
 
             last_posterior_index = w - 1;
 
@@ -70,8 +73,8 @@ for w = 2:length(time)
 
 end
 
-posterior = struct('phone_posterior', phone_posterior, 'trans_posterior', trans_posterior,...
-    'hazard', hazard, 'transition', transition, 'pt_dist', pt_dist);
+posterior = struct('likelihood', likelihood, 'phone_posterior', phone_posterior, 'trans_posterior', trans_posterior,...
+    'hazard', hazard, 'transition', transition, 'pt_dist', pt_dist, 'inv_entropy', inv_entropy);
 
 end
 
