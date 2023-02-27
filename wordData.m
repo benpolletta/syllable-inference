@@ -12,17 +12,17 @@ if length(SI) ~= 6300
     name = sprintf('%s_%dsentences', name, length(SI));
 end 
 
+timit_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
+
+timit_filenames_file = [timit_dir, 'DOC/allphonelist_filenames.txt'];
+filename_fid = fopen(timit_filenames_file, 'r');
+file_list = textscan(filename_fid, '%s', 'Delimiter', '\n');
+fclose(filename_fid);
+file_list = file_list{1};
+
 %results(length(SI)) = struct();
 
 for s = 1:length(SI)
-    
-    sentence_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
-    
-    file_list_id = fopen([sentence_dir, 'wavFileList.txt'], 'r');
-    file_list = textscan(file_list_id, '%s');
-    fclose(file_list_id);
-    
-    file_list = file_list{1};
     
     file_index = SI(s);
     
@@ -30,12 +30,11 @@ for s = 1:length(SI)
         file_index = round(file_index*length(file_list));
     end
     
-    wavfile_name = file_list{file_index};
-    file_name = extractBefore(wavfile_name, '.WAV');
+    file_name = file_list{file_index};
     
     %% Retrieving words and their start and end times.
     
-    word_filename = [sentence_dir, file_name, '.WRD'];
+    word_filename = [timit_dir, file_name, '.WRD'];
     fid = fopen(word_filename, 'r');
     word_data = textscan(fid, '%s');
     fclose(fid);
@@ -60,31 +59,45 @@ for s = 1:length(SI)
     
     phones = phone_data(3, :);
     
-    phone_indices = cellfun(@str2num, phone_data(1:2, :));
-    mid_phone_indices = mean(phone_indices);
+    phone_indices = cellfun(@str2num, phone_data(1:2, :))';
+    %mid_phone_indices = mean(phone_indices);
     
     phone_times = (phone_indices/16)';
     phone_lengths = diff(phone_times, [], 2);
     
+    %% Retrieving & writing pronunciations.
+
+    pron_filename = [sentence_dir, file_name, '.WRDpron'];
+    fid = fopen(pron_filename, 'w');
+
     pronunciations = cell(size(word_lengths));
     
     for w = 1:length(word_lengths)
         
-        this_word_indicator = mid_phone_indices > word_indices(w, 1) & mid_phone_indices < word_indices(w, 2);
+        this_word_indicator = any(phone_indices > word_indices(w, 1) & phone_indices < word_indices(w, 2), 2);
         
-        pronunciations{w} = {phones(this_word_indicator)};
+        this_pronunciation = phones(this_word_indicator);
+
+        pronunciations{w} = {this_pronunciation};
+
+        format = join(repmat({'%s\t'}, 1, length(this_pronunciation)), '');
+        format = [format{1}, '\n'];
+
+        fprintf(fid, format, this_pronunciation{:})
         
     end
+
+    fclose(fid)
     
     %% Retrieving syllable boundary_times & normalizing word lengths.
     
-    tsylb_filename = [sentence_dir, file_name, '.TSYLB'];
-    fid = fopen(tsylb_filename, 'r');
-    tsylb_indices = textscan(fid, '%d');
+    sylb_filename = [sentence_dir, file_name, '.SYLB'];
+    fid = fopen(sylb_filename, 'r');
+    sylb_indices = textscan(fid, '%d %d %s');
     fclose(fid);
-    tsylb_indices = tsylb_indices{1};
-    syllable_lengths = diff(tsylb_indices/16);
-    mid_syl_indices = tsylb_indices(1:(end - 1)) + diff(tsylb_indices)/2;
+    sylb_indices = sylb_indices{1};
+    syllable_lengths = diff(sylb_indices/16);
+    mid_syl_indices = sylb_indices(1:(end - 1)) + diff(sylb_indices)/2;
     
     norm_word_lengths = word_lengths/mean(syllable_lengths);
     
@@ -104,7 +117,7 @@ for s = 1:length(SI)
             
             syl_index = this_word_index(syl);
             
-            this_syl_indicator = mid_phone_indices > tsylb_indices(syl_index) & mid_phone_indices < tsylb_indices(syl_index + 1);
+            this_syl_indicator = any(phone_indices > sylb_indices(syl_index) & phone_indices < sylb_indices(syl_index + 1), 2);
         
             syllables{syl} = phones(this_syl_indicator);
             
