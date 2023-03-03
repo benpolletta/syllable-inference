@@ -11,14 +11,14 @@ name = 'Data';
 if length(SI) ~= 6300
     name = sprintf('%s_%dsentences', name, length(SI));
 end
+  
+sentence_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
+
+file_list_id = fopen([sentence_dir, 'DOC/allphonelist_filenames.txt'], 'r');
+file_list = textscan(file_list_id, '%s');
+fclose(file_list_id);
 
 for s = 1:length(SI)
-    
-    sentence_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
-    
-    file_list_id = fopen([sentence_dir, 'wavFileList.txt'], 'r');
-    file_list = textscan(file_list_id, '%s');
-    fclose(file_list_id);
     
     file_list = file_list{1};
     
@@ -28,8 +28,8 @@ for s = 1:length(SI)
         file_index = round(file_index*length(file_list));
     end
     
-    wavfile_name = file_list{file_index};
-    file_name = extractBefore(wavfile_name, '.WAV');
+    file_name = file_list{file_index};
+    % file_name = extractBefore(file_name, '.WAV');
     
     %% Retrieving phonemes and their start and end times.
     
@@ -49,9 +49,9 @@ for s = 1:length(SI)
     
     %% Retrieving syllable boundary_times & normalizing phone lengths.
     
-    tsylb_filename = [sentence_dir, file_name, '.TSYLB'];
-    fid = fopen(tsylb_filename, 'r');
-    tsylb_indices = textscan(fid, '%d');
+    sylb_filename = [sentence_dir, file_name, '.SYLB'];
+    fid = fopen(sylb_filename, 'r');
+    tsylb_indices = textscan(fid, '%d %d %s');
     fclose(fid);
     tsylb_indices = tsylb_indices{1};
     syllable_times = (tsylb_indices/16 + onset_time)/1000;
