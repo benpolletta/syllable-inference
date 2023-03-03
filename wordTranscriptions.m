@@ -34,6 +34,8 @@ for s = 1:length(SI)
     end
     
     file_name = file_list{file_index};
+
+    % if filename == 'TEST/DR8/MRES0/SI587', dbstop, end
     
     %% Retrieving words and their start and end times.
     
@@ -70,9 +72,6 @@ for s = 1:length(SI)
     
     %% Retrieving & writing phonemic transcriptions.
 
-    pron_filename = [sentence_dir, file_name, '.WRDpron'];
-    fid = fopen(pron_filename, 'w');
-
     pronunciations = cell(size(word_lengths));
 
     fprintf(outfile_fid, '%s ', '$##');
@@ -84,7 +83,6 @@ for s = 1:length(SI)
         this_pronunciation = phones(this_word_indicator);
 
         pronunciations{w} = {this_pronunciation};
-        fprintf(fid, '%d %d %s\n', word_times(w, :), strjoin(this_pronunciation, '/'));
         
         format = join(repmat({'%s '}, 1, length(this_pronunciation)), '');
         format = format{1}; % , '\n'];
@@ -99,8 +97,6 @@ for s = 1:length(SI)
     end
 
     fprintf(outfile_fid, '%s\n', '##$');
-
-    fclose(fid);
     
     %% Saving results.
     
