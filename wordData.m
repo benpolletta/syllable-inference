@@ -1,5 +1,7 @@
 function results = wordData(SI)
 
+global onset_time
+
 if nargin < 1, SI = []; end
 if isempty(SI), SI = (1:6300)/6300; end
 
@@ -22,7 +24,16 @@ file_list = file_list{1};
 
 %results(length(SI)) = struct();
 
+wsp_map = load('word2sylb2phone_bysentence.mat');
+wsp_map = wsp_map.results;
+% wsp_map_fields = fieldnames(wsp_map_data);
+% for f = 1:length(wsp_map_fields)
+%     eval(['%s = wsp_map_data.%s'], wsp_map_fields{f});
+% end
+
 for s = 1:length(SI)
+
+    % if ~(s == 386 || s == 557 || s == 584)
     
     file_index = SI(s);
     
@@ -32,146 +43,104 @@ for s = 1:length(SI)
     
     file_name = file_list{file_index};
     
-    %% Retrieving words and their start and end times.
+    %% Retrieving words, phonemes, and syllables and their start and end times.
     
     word_filename = [timit_dir, file_name, '.WRD'];
-    fid = fopen(word_filename, 'r');
-    word_data = textscan(fid, '%s');
-    fclose(fid);
-    word_data = word_data{1};
-    word_data = reshape(word_data, 3, length(word_data)/3);
+    [words, word_times, word_durations] = getUnits(word_filename);
     
-    words = word_data(3, :);
+    phone_filename = [timit_dir, file_name, '.tsylbPHN'];
+    [phones, phone_times, phone_durations] = getUnits(phone_filename);
+
+    syl_filename = [timit_dir, file_name, '.SYLB'];
+    [syllables, syl_times, syl_durations] = getUnits(syl_filename);
     
-    word_indices = cellfun(@str2num, word_data(1:2, :))';
-    word_times = (word_indices/16 + onset_time);
+    %% Normalizing word lengths.
     
-    word_lengths = diff(word_times, [], 2); 
-    
-    %% Retrieving phonemes and their start and end times.
-    
-    phone_filename = [timit_dir, file_name, '.PHN'];
-    fid = fopen(phone_filename, 'r');
-    phone_data = textscan(fid, '%s');
-    fclose(fid);
-    phone_data = phone_data{1};
-    phone_data = reshape(phone_data, 3, length(phone_data)/3);
-    
-    phones = phone_data(3, :);
-    
-    phone_indices = cellfun(@str2num, phone_data(1:2, :))';
-    %mid_phone_indices = mean(phone_indices);
-    
-    phone_times = (phone_indices/16)';
-    phone_lengths = diff(phone_times, [], 2);
-    
-    %% Retrieving & writing pronunciations.
+    norm_word_durations = word_durations/mean(syl_durations);
+
+    %% Writing pronunciations.
 
     pron_filename = [timit_dir, file_name, '.WRDpron'];
     fid = fopen(pron_filename, 'w');
 
-    pronunciations = cell(size(word_lengths));
-    
-    for w = 1:length(word_lengths)
-        
-        this_word_indicator = any(phone_indices > word_indices(w, 1) & phone_indices < word_indices(w, 2), 2);
-        
-        this_pronunciation = phones(this_word_indicator);
+    these_pronunciations = wsp_map(file_index).word_cell;
 
-        pronunciations{w} = {this_pronunciation};
+    if any(word_durations == 0)
 
-        format = join(repmat({'%s\t'}, 1, length(this_pronunciation)), '');
-        format = [format{1}, '\n'];
+        zero_duration_indices = find(word_durations == 0);
 
-        fprintf(fid, format, this_pronunciation{:});
-        
-    end
+        for i = 1:length(zero_duration_indices)
 
-    fclose(fid);
-    
-    %% Retrieving syllable boundary_times & normalizing word lengths.
-    
-    tsylb_filename = [timit_dir, file_name, '.TSYLB'];
-    fid = fopen(tsylb_filename, 'r');
-    tsylb_indices = textscan(fid, '%d');
-    fclose(fid);
-    tsylb_indices = tsylb_indices{1};
-    syllable_lengths = diff(tsylb_indices/16);
-    mid_syl_indices = tsylb_indices(1:(end - 1)) + diff(tsylb_indices)/2;
-    
-    norm_word_lengths = word_lengths/mean(syllable_lengths);
-    
-    syllabifications = cell(size(word_lengths));
-    
-    for w = 1:length(word_lengths)
-        
-        this_word_indicator = mid_syl_indices > word_indices(w, 1) & mid_syl_indices < word_indices(w, 2);
-        
-        this_word_index = find(this_word_indicator);
-        
-        num_syllables(w) = length(this_word_index);
-        
-        syllables = cell(num_syllables(w), 1);
-        
-        for syl = 1:num_syllables(w)
-            
-            syl_index = this_word_index(syl);
-            
-            this_syl_indicator = any(phone_indices > tsylb_indices(syl_index) & phone_indices < tsylb_indices(syl_index + 1), 2);
-        
-            syllables{syl} = phones(this_syl_indicator);
-            
+            these_pronunciations((zero_duration_indices(i):end) + 1) = these_pronunciations(zero_duration_indices(i):end);
+
+            these_pronunciations{(zero_duration_indices(i))} = '';
+
         end
-        
-        syllabifications{w} = {syllables};
-        
+
+        wsp_map(file_index).word_cell = these_pronunciations;
+
     end
+
+    for_print = mat2cell(word_times, ones(size(word_times, 1), 1), [1 1]);
+    for_print(:, end + 1) = these_pronunciations(:);
+    for_print = for_print';
+    
+    fprintf(fid, '%d %d %s\n', for_print{:});
+
+    fclose(fid);
     
     %% Saving results.
     
-    results(s) = struct('word_lengths', word_lengths, 'words', {words}, 'pronunciations', {pronunciations},...
-        'syllable_lengths', syllable_lengths, 'norm_word_lengths', norm_word_lengths, 'syllabifications', {syllabifications});
-    
+    results(s) = struct('word_durations', word_durations, 'words', {words},... 'pronunciations', {pronunciations},...
+        'syl_durations', syl_durations, 'norm_word_durations', norm_word_durations); % 'syllabifications', {syllabifications});
+
 end
 
-word_length_vec = cat(1, results.word_lengths);
+word_length_vec = cat(1, results.word_durations);
 
-norm_word_length_vec = cat(1, results.norm_word_lengths);
+norm_word_length_vec = cat(1, results.norm_word_durations);
+
+word_syl_num_vec = cat(1, wsp_map.word_syl_num);
+
+word_phone_num_vec = cat(1, wsp_map.word_phone_num);
 
 word_vec = cat(2, results.words)';
 
-pronunciation_vec_cell = cat(1, results.pronunciations);
-pronunciation_vec_string = cellfun(@(x) strjoin(x{1}, '/'), pronunciation_vec_cell, 'unif', 0);
-
+pron_vec = cat(2, wsp_map.word_cell)';
 
 %% Collecting word lengths across sentences.
 
-%%% Grouping by words.
+%%% Calculating grouping variables.
+
+% Grouping by words.
 
 [word_index, word_id] = findgroups(word_vec);
 
-% Finding number of pronunciations.
+% Grouping by length in syllables.
 
-pronunciation_map_cell = splitapply(@(x) {x}, pronunciation_vec_cell, word_index);
-pronunciation_map_string = splitapply(@(x) {x}, pronunciation_vec_string, word_index);
-[pronunciation_index, unique_pronunciations] = cellfun(@findgroups, pronunciation_map_string, 'unif', 0);
+syl_num_id = min(word_syl_num_vec):max(word_syl_num_vec);
+
+% Grouping by length in phones.
+
+phone_num_id = min(word_phone_num_vec):max(word_phone_num_vec);
+
+%% Finding number of pronunciations per word, & distribution over pronunciations.
+
+%pron_map_cell = splitapply(@(x) {x}, pronunciation_vec_cell, word_index);
+pron_map = splitapply(@(x) {x}, pron_vec, word_index);
+[pronunciation_index, unique_pronunciations] = cellfun(@findgroups, pron_map, 'unif', 0);
 num_pronunciations = cellfun(@length, unique_pronunciations);
 
-%%% Grouping by phoneme class.
-
-[timit_map, ~] = find(timit2group_mat');
-[class_map, ~] = find(class_indicator');
-
-class_index = class_map(timit_map(word_index));
+%%% Computing_stats.
 
 no_bins = ceil(sqrt(length(SI)));
 
-vecs = {phone_length_vec, norm_phone_length_vec};
-indices = {phone_index, class_index};
-ids = {present_phonemes, class_names};
-vec_labels = {'phone', 'normPhone'};
-index_labels = {'', 'Class'};
-no_skipped = [3 1];
+vecs = {word_length_vec, norm_word_length_vec};
+indices = {word_index, word_syl_num_vec, word_phone_num_vec};
+ids = {word_id, syl_num_id, phone_num_id};
+vec_labels = {'word', 'normWord'};
+index_labels = {'', 'NumSylbs', 'NumPhones'};
+no_skipped = [];
 
 for v = 1:length(vecs)
     for i = 1:length(indices)
@@ -193,6 +162,25 @@ for v = 1:length(vecs)
         
     end
 end
+
+end
+
+function [units, times, lengths] = getUnits(filename)
+
+global onset_time
+
+fid = fopen(filename, 'r');
+data = textscan(fid, '%s');
+fclose(fid);
+data = data{1};
+data = reshape(data, 3, length(data)/3);
+
+units = data(3, :);
+
+indices = cellfun(@str2num, data(1:2, :))';
+times = (indices/16 + onset_time);
+
+lengths = diff(times, [], 2);
 
 end
 
