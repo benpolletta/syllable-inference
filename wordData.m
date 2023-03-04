@@ -51,12 +51,12 @@ for s = 1:length(SI)
     phone_filename = [timit_dir, file_name, '.tsylbPHN'];
     [phones, phone_times, phone_durations] = getUnits(phone_filename);
 
-    syl_filename = [timit_dir, file_name, '.SYLB'];
-    [syllables, syl_times, syl_durations] = getUnits(syl_filename);
+    sylb_filename = [timit_dir, file_name, '.SYLB'];
+    [syllables, sylb_times, sylb_durations] = getUnits(sylb_filename);
     
     %% Normalizing word lengths.
     
-    norm_word_durations = word_durations/mean(syl_durations);
+    norm_word_durations = word_durations/mean(sylb_durations);
 
     %% Writing pronunciations.
 
@@ -92,7 +92,7 @@ for s = 1:length(SI)
     %% Saving results.
     
     results(s) = struct('word_durations', word_durations, 'words', {words},... 'pronunciations', {pronunciations},...
-        'syl_durations', syl_durations, 'norm_word_durations', norm_word_durations); % 'syllabifications', {syllabifications});
+        'sylb_durations', sylb_durations, 'norm_word_durations', norm_word_durations); % 'syllabifications', {syllabifications});
 
 end
 
@@ -100,7 +100,7 @@ word_length_vec = cat(1, results.word_durations);
 
 norm_word_length_vec = cat(1, results.norm_word_durations);
 
-word_syl_num_vec = cat(1, wsp_map.word_syl_num);
+word_sylb_num_vec = cat(1, wsp_map.word_sylb_num);
 
 word_phone_num_vec = cat(1, wsp_map.word_phone_num);
 
@@ -118,7 +118,7 @@ pron_vec = cat(2, wsp_map.word_cell)';
 
 % Grouping by length in syllables.
 
-syl_num_id = min(word_syl_num_vec):max(word_syl_num_vec);
+sylb_num_id = min(word_sylb_num_vec):max(word_sylb_num_vec);
 
 % Grouping by length in phones.
 
@@ -136,8 +136,8 @@ num_pronunciations = cellfun(@length, unique_pronunciations);
 no_bins = ceil(sqrt(length(SI)));
 
 vecs = {word_length_vec, norm_word_length_vec};
-indices = {word_index, word_syl_num_vec, word_phone_num_vec};
-ids = {word_id, syl_num_id, phone_num_id};
+indices = {word_index, word_sylb_num_vec, word_phone_num_vec};
+ids = {word_id, sylb_num_id, phone_num_id};
 vec_labels = {'word', 'normWord'};
 index_labels = {'', 'NumSylbs', 'NumPhones'};
 no_skipped = [];
