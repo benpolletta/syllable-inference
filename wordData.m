@@ -1,9 +1,11 @@
-function results = wordData(SI)
+function results = wordData(SI, reuse_results)
 
 global onset_time
 
 if nargin < 1, SI = []; end
 if isempty(SI), SI = (1:6300)/6300; end
+if nargin < 2, reuse_results = []; end
+if isempty(reuse_results), reuse_results = true; end
 
 time = 0:.1:10000;
 
@@ -22,89 +24,97 @@ file_list = textscan(filename_fid, '%s', 'Delimiter', '\n');
 fclose(filename_fid);
 file_list = file_list{1};
 
-%results(length(SI)) = struct();
-
 wsp_map = load('word2sylb2phone_bysentence.mat');
 wsp_map = wsp_map.results;
-% wsp_map_fields = fieldnames(wsp_map_data);
-% for f = 1:length(wsp_map_fields)
-%     eval(['%s = wsp_map_data.%s'], wsp_map_fields{f});
-% end
 
-for s = 1:length(SI)
-
-    % if ~(s == 386 || s == 557 || s == 584)
+if reuse_results & exist('wordData_results.mat') == 2
     
-    file_index = SI(s);
-    
-    if isfloat(file_index) && file_index < 1 && file_index > 0
-        file_index = round(file_index*length(file_list));
-    end
-    
-    file_name = file_list{file_index};
-    
-    %% Retrieving words, phonemes, and syllables and their start and end times.
-    
-    word_filename = [timit_dir, file_name, '.WRD'];
-    [words, word_times, word_durations] = getUnits(word_filename);
-    
-    phone_filename = [timit_dir, file_name, '.tsylbPHN'];
-    [phones, phone_times, phone_durations] = getUnits(phone_filename);
+    word_data = load('wordData_results.mat');
 
-    sylb_filename = [timit_dir, file_name, '.SYLB'];
-    [syllables, sylb_times, sylb_durations] = getUnits(sylb_filename);
-    
-    %% Normalizing word lengths.
-    
-    norm_word_durations = word_durations/mean(sylb_durations);
+    results = word_data.results;
+    % wsp_map = word_data.wsp_map;
 
-    %% Writing pronunciations.
+else
 
-    pron_filename = [timit_dir, file_name, '.WRDpron'];
-    fid = fopen(pron_filename, 'w');
+    for s = 1:length(SI)
 
-    these_pronunciations = wsp_map(file_index).word_cell;
+        % if ~(s == 386 || s == 557 || s == 584)
 
-    if any(word_durations == 0)
+        file_index = SI(s);
 
-        zero_duration_indices = find(word_durations == 0);
-
-        for i = 1:length(zero_duration_indices)
-
-            these_pronunciations((zero_duration_indices(i):end) + 1) = these_pronunciations(zero_duration_indices(i):end);
-
-            these_pronunciations{(zero_duration_indices(i))} = '';
-
+        if isfloat(file_index) && file_index < 1 && file_index > 0
+            file_index = round(file_index*length(file_list));
         end
 
-        wsp_map(file_index).word_cell = these_pronunciations;
+        file_name = file_list{file_index};
+
+        %% Retrieving words, phonemes, and syllables and their start and end times.
+
+        word_filename = [timit_dir, file_name, '.WRD'];
+        [words, word_times, word_durations] = getUnits(word_filename);
+
+        phone_filename = [timit_dir, file_name, '.tsylbPHN'];
+        [phones, phone_times, phone_durations] = getUnits(phone_filename);
+
+        sylb_filename = [timit_dir, file_name, '.SYLB'];
+        [syllables, sylb_times, sylb_durations] = getUnits(sylb_filename);
+
+        %% Normalizing word lengths.
+
+        norm_word_durations = double(word_durations)/mean(double(sylb_durations));
+
+        %% Writing pronunciations.
+
+        pron_filename = [timit_dir, file_name, '.WRDpron'];
+        fid = fopen(pron_filename, 'w');
+
+        these_pronunciations = wsp_map(file_index).word_cell;
+
+        %         %% Adding in words with zero durations.
+        %         if any(word_durations == 0)
+        %
+        %             zero_duration_indices = find(word_durations == 0);
+        %
+        %             for i = 1:length(zero_duration_indices)
+        %
+        %                 these_pronunciations((zero_duration_indices(i):end) + 1) = these_pronunciations(zero_duration_indices(i):end);
+        %
+        %                 these_pronunciations{(zero_duration_indices(i))} = '';
+        %
+        %             end
+        %
+        %             wsp_map(file_index).word_cell = these_pronunciations;
+        %
+        %         end
+
+        for_print = mat2cell(word_times, ones(size(word_times, 1), 1), [1 1]);
+        for_print(:, end + 1) = these_pronunciations(:);
+        for_print = for_print';
+
+        fprintf(fid, '%d %d %s\n', for_print{:});
+
+        fclose(fid);
+
+        %% Saving results.
+
+        results(s) = struct('word_durations', word_durations, 'words', {words},... 'pronunciations', {pronunciations},...
+            'sylb_durations', sylb_durations, 'norm_word_durations', norm_word_durations); % 'syllabifications', {syllabifications});
 
     end
 
-    for_print = mat2cell(word_times, ones(size(word_times, 1), 1), [1 1]);
-    for_print(:, end + 1) = these_pronunciations(:);
-    for_print = for_print';
-    
-    fprintf(fid, '%d %d %s\n', for_print{:});
-
-    fclose(fid);
-    
-    %% Saving results.
-    
-    results(s) = struct('word_durations', word_durations, 'words', {words},... 'pronunciations', {pronunciations},...
-        'sylb_durations', sylb_durations, 'norm_word_durations', norm_word_durations); % 'syllabifications', {syllabifications});
+    save('wordData_results.mat', 'results') %, 'wsp_map')
 
 end
 
-word_length_vec = cat(1, results.word_durations);
+word_length_vec = double(cat(1, results.word_durations));
 
-norm_word_length_vec = cat(1, results.norm_word_durations);
+norm_word_length_vec = double(cat(1, results.norm_word_durations));
 
-word_sylb_num_vec = cat(1, wsp_map.word_sylb_num);
+word_sylb_num_vec = cat(2, wsp_map.word_sylb_num)';
 
-word_phone_num_vec = cat(1, wsp_map.word_phone_num);
+word_phone_num_vec = cat(2, wsp_map.word_phone_num)';
 
-word_vec = cat(2, results.words)';
+word_vec = cat(1, results.words);
 
 pron_vec = cat(2, wsp_map.word_cell)';
 
@@ -118,11 +128,13 @@ pron_vec = cat(2, wsp_map.word_cell)';
 
 % Grouping by length in syllables.
 
-sylb_num_id = min(word_sylb_num_vec):max(word_sylb_num_vec);
+sylb_num_id = mat2cell(min(word_sylb_num_vec):max(word_sylb_num_vec), 1, ones(1, range(word_sylb_num_vec) + 1));
+sylb_num_id = cellfun(@num2str, sylb_num_id, 'unif', 0)
 
 % Grouping by length in phones.
 
-phone_num_id = min(word_phone_num_vec):max(word_phone_num_vec);
+phone_num_id = mat2cell(min(word_phone_num_vec):max(word_phone_num_vec), 1, ones(1, range(word_phone_num_vec) + 1));
+phone_num_id = cellfun(@num2str, phone_num_id, 'unif', 0)
 
 %% Finding number of pronunciations per word, & distribution over pronunciations.
 
@@ -136,11 +148,11 @@ num_pronunciations = cellfun(@length, unique_pronunciations);
 no_bins = ceil(sqrt(length(SI)));
 
 vecs = {word_length_vec, norm_word_length_vec};
-indices = {word_index, word_sylb_num_vec, word_phone_num_vec};
+indices = {word_index, word_sylb_num_vec + 1, word_phone_num_vec};
 ids = {word_id, sylb_num_id, phone_num_id};
 vec_labels = {'word', 'normWord'};
 index_labels = {'', 'NumSylbs', 'NumPhones'};
-no_skipped = [];
+no_skipped = [0 0 0];
 
 for v = 1:length(vecs)
     for i = 1:length(indices)
@@ -153,10 +165,10 @@ for v = 1:length(vecs)
         set(gca, 'XTick', 1:length(ids{i}), 'XTickLabel', ids{i})
         xtickangle(45)
         axis tight
-        title('Phoneme Distribution')
+        title('Word Distribution')
         ylabel('Probability')
         
-        saveas(gcf, [fname, '.fig'])
+        saveas(gcf, [fname, '_prob.fig'])
         
         plotHistograms(fname, ids{i}(1:(end - no_skipped(i))), bin_centers(1:(end - no_skipped(i)), :)', hist(1:(end - no_skipped(i)), :)')
         
@@ -170,14 +182,14 @@ function [units, times, lengths] = getUnits(filename)
 global onset_time
 
 fid = fopen(filename, 'r');
-data = textscan(fid, '%s');
+data = textscan(fid, '%d%d%s'); % '%s');
 fclose(fid);
-data = data{1};
-data = reshape(data, 3, length(data)/3);
+% data = data{1};
+% data = reshape(data, 3, length(data)/3);
 
-units = data(3, :);
+units = data{3}; % (3, :);
 
-indices = cellfun(@str2num, data(1:2, :))';
+indices = cell2mat(data(1:2)); % cellfun(@str2num, data(1:2, :))';
 times = (indices/16 + onset_time);
 
 lengths = diff(times, [], 2);
@@ -219,7 +231,7 @@ set(gca, 'YTick', 1:length(id), 'YTickLabel', id)
 
 shading interp
 
-title('Phoneme Duration Distribution')
+title('Word Duration Distribution')
 
 % xtickangle(-45)
 
@@ -255,26 +267,30 @@ nochange_colorbar(gca)
 %     
 % end
 
-saveas(gcf, [fname, '.fig'])
+saveas(gcf, [fname, '_duration.fig'])
 
-save_as_pdf(gcf, fname)
+% save_as_pdf(gcf, fname)
 
-figure
+if length(id) < 100
 
-colors = flipud(hsv(length(id)));
+    figure
 
-set(gca, 'NextPlot', 'add', 'ColorOrder', colors)
+    colors = flipud(hsv(length(id)));
 
-plot(bin_centers, hist, 'LineWidth', 2)
+    set(gca, 'NextPlot', 'add', 'ColorOrder', colors)
 
-legend(id)
+    plot(bin_centers, hist, 'LineWidth', 2)
 
-axis tight
+    legend(id)
 
-title('Phoneme Duration Distribution')
+    axis tight
 
-saveas(gcf, [fname, '_line.fig'])
+    title('Word Duration Distribution')
 
-save_as_pdf(gcf, [fname, '_line'])
+    saveas(gcf, [fname, '_line.fig'])
+
+    % save_as_pdf(gcf, [fname, '_duration_line'])
+
+end
 
 end

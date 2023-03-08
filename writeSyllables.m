@@ -31,19 +31,14 @@ for s = 1:length(tsylb_output)
     
     filename = timit_filenames{s};
     phone_filename = [timit_dir, filename, '.tsylbPHN'];
-    %     fid = fopen(full_filename, 'r');
-    %     sentence_phones = textscan(fid, '%s');
-    %     fclose(fid);
-    %     sentence_phones = sentence_phones{1};
-    %     sentence_phones = reshape(sentence_phones, 3, length(sentence_phones)/3);
     [phone_cell, phone_indices, phone_durations] = getUnits(phone_filename); % sentence_phones(3, :);
     phone_cell(cellfun(@(x) contains(x, '$'), phone_cell)) = [];
     num_phones = length(phone_cell);
     %     phone_indices = cellfun(@str2num, sentence_phones(1:2, :))';
     phone_indices([1 end], :) = [];
 
-    %     word_filename = [timit_dir, filename, '.WRD'];
-    %     [word_cell, word_indices, word_durations] = getUnits(word_filename);
+    word_filename = [timit_dir, filename, '.WRD'];
+    [word_cell, word_indices, word_durations] = getUnits(word_filename);
    
     sentence_tsylb = tsylb_output{s}{1};
 
@@ -60,8 +55,8 @@ for s = 1:length(tsylb_output)
     word_sylb_nonzero_indicator = cellfun(@(x) cellfun(@(y) length(y) ~= 0, x), word_sylb_cell, 'unif', false);
     word_sylb_cell = cellfun(@(x, y) x(y), word_sylb_cell, word_sylb_nonzero_indicator, 'unif', 0);
     
-    word_sylb_extract = cellfun(@(x) extractBetween(x, '[', ']'), word_cell, 'unif', false);
-    word_sylb_num = cellfun(@length, word_sylb_extract);
+    zero_sylb_words = cellfun(@(x) ~contains(x, {'[', ']'}), word_cell);
+    % zero_sylb_words = cellfun(@(x) length(x) == 0, word_sylb_extract);
     %     word_sylb_cell = cellfun(@strip, word_sylb_cell, 'unif', 0);
 
     %% Splitting syllables into phones.
@@ -70,19 +65,25 @@ for s = 1:length(tsylb_output)
     word_sylb_phone_nonzero_indicator = cellfun(@(x) cellfun(@(y) cellfun(@(z) length(z) ~= 0, y), x, 'unif', 0), word_sylb_phone_cell, 'unif', 0);
     word_sylb_phone_cell = cellfun(@(x, y) cellfun(@(z, w) z(w), x, y, 'unif', 0), word_sylb_phone_cell, word_sylb_phone_nonzero_indicator, 'unif', 0);
 
-    %     %% Adding in words with zero durations.
-    %     if any(word_durations == 0)
-    %         zero_duration_indices = find(word_durations == 0);
-    %         for i = 1:length(zero_duration_indices)
-    %             word_sylb_phone_cell((zero_duration_indices(i):end) + 1) = word_sylb_phone_cell(zero_duration_indices(i):end);
-    %             word_sylb_phone_cell{(zero_duration_indices(i))} = {''};
-    %         end
-    %     end
+    %% Adding in words with zero durations.
+    zero_duration_indices = [];
+    if any(word_durations == 0)
+        zero_duration_indices = find(word_durations == 0);
+        for i = 1:length(zero_duration_indices)
+%             word_sylb_cell((zero_duration_indices(i):end) + 1) = word_sylb_cell(zero_duration_indices(i):end);
+%             word_sylb_cell{(zero_duration_indices(i))} = {''};
+            word_sylb_phone_cell((zero_duration_indices(i):end) + 1) = word_sylb_phone_cell(zero_duration_indices(i):end);
+            word_sylb_phone_cell{(zero_duration_indices(i))} = {{''}};
+        end
+    end
 
     %% Counting syllables & phones.
     word_sylb_phone_num = cellfun(@(x) cellfun(@length, x), word_sylb_phone_cell, 'unif', 0);
     word_phone_num = cellfun(@sum, word_sylb_phone_num);
-    % word_sylb_num = cellfun(@length, word_sylb_cell);
+    word_sylb_num = cellfun(@length, word_sylb_cell);
+    word_sylb_num(zero_sylb_words) = 0;
+    word_sylb_num(zero_duration_indices) = 0;
+    word_sylb_num(word_phone_num == 0) = 0;
 
     %% Fixing words containing pauses transcribed as #.
 
@@ -101,7 +102,7 @@ for s = 1:length(tsylb_output)
         wsp_phones = cat(2, wsp_words{:});
         cum_w_count = cumsum(word_phone_num);
 
-        if length(t_words) == word_num - 1;
+        if length(t_words) == word_num - 1
 
             %% Assuming that a word is split in two by the #.
 
@@ -109,6 +110,7 @@ for s = 1:length(tsylb_output)
 
                 this_word_indicator = cum_w_count <= cum_t_count(i + 1) & cum_w_count > cum_t_count(i);
                 wsp2t_map(this_word_indicator) = i;
+                zero_sylb_words(i) = all(zero_sylb_words(this_word_indicator));
 
             end
 
@@ -164,42 +166,10 @@ for s = 1:length(tsylb_output)
 
         end
 
-        %             % Strategy is to line up two phoneme strings (one from word_sylb_cell & one from transcript),
-        %             % deleting from word_sylb_cell & inserting from transcript as needed.
-        %             % Getting two strings of phonemes.
-        %
-        %             % Getting cumulative phone counts w/in each syllable.
-        %             sylb_ends = cumsum(cat(2, word_sylb_phone_num{:}));
-        %             sylb_starts = [1, sylb_ends(1:(end - 1)) + 1];
-        %             sylb_bounds = [sylb_starts; sylb_ends]';
-        %             word_sylb_bounds = mat2cell(sylb_bounds, cellfun(@length, word_sylb_phone_cell), 2); % middle argument b/c word_sylb_num doesn't include zero-syllable words
-        %
-        %             pound_index = find(strcmp(t_phones, '#'), 1);
-        %             pound_sylb_index = cellfun(@(x) x(:, 1) <= pound_index - 1 & x(:, 2) >= pound_index - 1, word_sylb_bounds, 'UniformOutput', 0);
-        %             pa_bounds = cellfun(@(x, y) x(y, :), word_sylb_bounds, pound_adjacent);
-        %
-        %             % Are these syllables part of the same word?
-        %
-        %
-        %             % Retrieving start and end indices of split words.
-        %             word_end_phone = min(cumsum(word_phone_num), num_phones);
-        %             word_start_phone = min([0, word_end_phone((1:(end - 1)))] + 1, num_phones);
-        %             word_phone_boundaries = [word_start_phone; word_end_phone]';
-        %
-        %             ts_end_phone = min(cumsum(transcript_phone_counts), num_phones);
-        %             ts_start_phone = min([0, ts_end_phone((1:(end - 1)))] + 1, num_phones);
-        %             ts_phone_boundaries = [ts_start_phone; ts_end_phone]';
-
-        %                     if word_phone_num(up_to) = (transcript_phone_counts(up_to) - 1)
-        %
-        %                         word_sylb_phone_cell{{up_to}}{1}{end + 1} = '#';
-        %
-        %                     else
-        %                     end
-
-        % Recounting syllables and phones per word.
+        % Recounting phones per syllable and word.
         word_sylb_phone_num = cellfun(@(x) cellfun(@length, x), word_sylb_phone_cell, 'unif', 0);
         word_phone_num = cellfun(@sum, word_sylb_phone_num);
+
 
 %         % Adjusting pound_index.
 %         pound_phone_index = pound_phone_index + (cumsum(ones(size(pound_phone_index))) > p);
@@ -216,6 +186,12 @@ for s = 1:length(tsylb_output)
     %% Rejoining phones.
     word_sylb_cell = cellfun(@(x) cellfun(@(y) strjoin(y, '/'), x, 'unif', 0), word_sylb_phone_cell, 'unif', 0);
     word_cell = cellfun(@(x) strjoin(x, '*'), word_sylb_cell, 'unif', 0);
+
+    %% Recounting syllables per word.
+    word_sylb_num = cellfun(@length, word_sylb_cell);
+    word_sylb_num(zero_sylb_words) = 0;
+    word_sylb_num(zero_duration_indices) = 0;
+    word_sylb_num(word_phone_num == 0) = 0;
 
     %% Aggregating into syllables.
     sylb_phone_cell = cat(2, word_sylb_phone_cell{:});
