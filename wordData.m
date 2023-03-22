@@ -27,6 +27,11 @@ file_list = file_list{1};
 wsp_map = load('word2sylb2phone_bysentence.mat');
 wsp_map = wsp_map.results;
 
+dict = load('word2sylb2phone_DICT.mat');
+dict = dict.results;
+dict_words = {dict(:).word};
+% dict_words = cellfun(@(x) erase(x, '-'), dict_words, 'unif', 0);
+
 if reuse_results & exist('wordData_results.mat') == 2
     
     word_data = load('wordData_results.mat');
@@ -36,9 +41,9 @@ if reuse_results & exist('wordData_results.mat') == 2
 
 else
 
-    for s = 1:length(SI)
+%     [ambiguous_words, ambiguous_sentences, resolutions] = deal({});
 
-        % if ~(s == 386 || s == 557 || s == 584)
+    for s = 1:length(SI)
 
         file_index = SI(s);
 
@@ -62,6 +67,54 @@ else
         %% Normalizing word lengths.
 
         norm_word_durations = double(word_durations)/mean(double(sylb_durations));
+
+        %         %% Finding canonical words.
+        %
+        %         canonical_words = cell(size(words));
+        %
+        %         for w = 1:length(words)
+        %
+        %             if any(strcmp(words{w}, dict_words))
+        %
+        %                 canonical_words{w} = dict_words(strcmp(words{w}, dict_words));
+        %
+        %             else
+        %
+        %                 possible_words = dict_words(contains(dict_words, words{w}));
+        %
+        %                 if length(possible_words) == 1
+        %
+        %                     canonical_words(w) = possible_words(:);
+        %
+        %                 else
+        %
+        %                     sentence = strjoin(words, ' ');
+        %
+        %                     amb_index = find(strcmp(words{w}, ambiguous_words) & strcmp(sentence, ambiguous_sentences));
+        %
+        %                     if ~isempty(amb_index)
+        %
+        %                         canonical_words(w) = resolutions(amb_index);
+        %
+        %                     else
+        %
+        %                         ambiguous_words(end + 1) = words(w);
+        %
+        %                         ambiguous_sentences(end + 1) = {sentence};
+        %
+        %                         prompt = sprintf('No unique match for %s in sentence\n ''%s'' \n is found in TIMITDIC. Possible matches are:\n %s.\n Please enter the index of the correct word:\n',words{w}, strjoin(words, ' '), strjoin(possible_words, ', '));
+        %
+        %                         index = input(prompt);
+        %
+        %                         [canonical_words(w), resolutions(end + 1)] = deal(possible_words(index));
+        %
+        %                     end
+        %
+        %                 end
+        %
+        %             end
+        %
+        %         end
 
         %% Writing pronunciations.
 
@@ -97,12 +150,12 @@ else
 
         %% Saving results.
 
-        results(s) = struct('word_durations', word_durations, 'words', {words},... 'pronunciations', {pronunciations},...
+        results(s) = struct('word_durations', word_durations, 'words', {words}, 'canonical_words', {canonical_words},... 'pronunciations', {pronunciations},...
             'sylb_durations', sylb_durations, 'norm_word_durations', norm_word_durations); % 'syllabifications', {syllabifications});
 
     end
 
-    save('wordData_results.mat', 'results') %, 'wsp_map')
+    save('wordData_results.mat', 'results') % , 'ambiguous_words', 'ambiguous_sentences', 'resolutions') %, 'wsp_map')
 
 end
 

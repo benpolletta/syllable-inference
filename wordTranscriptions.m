@@ -1,7 +1,11 @@
-function transcription_data = wordTranscriptions(SI)
+function transcription_data = wordTranscriptions
+% Transcribes sentences in the TIMIT corpus with word boundaries marked by
+% hashtags (#) - i.e., in a format readable by the syllabification program
+% tsylb2.
+% Writes word transcriptions (as sequences of phonemes) in files w/ extension .WRDphn.
+% Produces wordTranscriptions.mat, which collects pronunciations by (unique) word.
 
-if nargin < 1, SI = []; end
-if isempty(SI), SI = (1:6300)/6300; end
+SI = (1:6300)/6300;
 
 time = 0:.1:10000;
 
@@ -22,7 +26,7 @@ fclose(file_list_id);
 
 file_list = file_list{1};
 
-outfile_name = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/DOC/allphonelist_tsylb_words.txt';
+outfile_name = [sentence_dir, 'DOC/allphonelist_tsylb_words.txt'];
 outfile_fid = fopen(outfile_name, 'w');
 
 for s = 1:length(SI)
@@ -74,6 +78,9 @@ for s = 1:length(SI)
 
     pronunciations = cell(size(word_lengths));
 
+    pron_filename = [sentence_dir, file_name, '.WRDphn'];
+    fid = fopen(pron_filename, 'w');
+
     fprintf(outfile_fid, '%s ', '$##');
     
     for w = 1:length(word_lengths)
@@ -84,6 +91,8 @@ for s = 1:length(SI)
 
         pronunciations{w} = {this_pronunciation};
         
+        fprintf(fid, '%d %d %s\n', word_indices(w, :), strjoin(this_pronunciation(:), '/'));
+
         format = join(repmat({'%s '}, 1, length(this_pronunciation)), '');
         format = format{1}; % , '\n'];
         %fprintf(fid, [format, '\n'], this_pronunciation{:});
@@ -97,6 +106,8 @@ for s = 1:length(SI)
     end
 
     fprintf(outfile_fid, '%s\n', '##$');
+
+    fclose(fid);
     
     %% Saving results.
     
