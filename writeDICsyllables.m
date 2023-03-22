@@ -4,7 +4,7 @@ timit_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
 
 dic_file = [timit_dir, 'DOC/TIMITDIC_noheader.txt'];
 dic_fid = fopen(dic_file, 'r');
-dic_words = textscan(dic_fid, '%s', 'Delimiter', '\n');
+dic_words = textscan(dic_fid, '%s', 'headerLines', 1, 'Delimiter', '\n');
 fclose(dic_fid);
 dic_words = dic_words{1};
 dic_words = extractBefore(dic_words, '/');
