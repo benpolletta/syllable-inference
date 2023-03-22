@@ -1,4 +1,6 @@
-function [sentence, likelihood, posterior] = plotSLP
+function [sentence, likelihood, posterior] = plotSLP(method)
+
+if nargin < 1, method = ''; end
 
 %% Getting sentence.
 
@@ -37,7 +39,7 @@ scaled_ie = (likelihood.inv_entropy - min(likelihood.inv_entropy))*(length(likel
 plot(gca, likelihood.time, scaled_ie, 'w--', 'LineWidth', 0.5)
 
 %% Calculating posterior.
-posterior = calc_phone_posterior_new(likelihood);
+posterior = calc_phone_posterior_new(likelihood, method);
 
 for_plot(2).time = likelihood.time;
 for_plot(2).input_vec = nanunitsum(posterior.phone_posterior);
@@ -52,12 +54,15 @@ hold on
 scaled_t3 = (posterior.trans_posterior - min(posterior.trans_posterior))*(length(likelihood.phones)/range(posterior.trans_posterior));
 plot(gca, likelihood.time, scaled_t3, 'w', 'LineWidth', 0.5)
 
-scaled_h = (posterior.hazard - min(posterior.hazard))*(length(likelihood.phones)/range(posterior.hazard));
+scaled_h = (posterior.hazard_est - min(posterior.hazard_est))*(length(likelihood.phones)/range(posterior.hazard_est));
 plot(gca, likelihood.time, scaled_h, 'y', 'LineWidth', 0.5)
+
+scaled_ie = (posterior.inv_entropy - min(posterior.inv_entropy))*(length(likelihood.phones)/range(posterior.inv_entropy));
+plot(gca, likelihood.time, scaled_ie, 'w--', 'LineWidth', 0.5)
 
 tree = split(sentence.filename, '/');
 
-saveas(gcf, sprintf('plotSLP_%s', tree{end}))
+saveas(gcf, sprintf('plotSLP_%s%s.fig', tree{end}, method))
 
 end
 
