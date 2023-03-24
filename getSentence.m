@@ -1,6 +1,7 @@
 function sentence = getSentence(time, no_channels, file_index, onset, transition_factor, lowfreq, highfreq, norm)
 
-if nargin == 0, time = (0:.01:6000)/1000; fs = 10^5; end
+if nargin == 0, time = (0:.01:6000)/1000; fs = 10^5;
+else, fs = length(time)/max(time); end
 if nargin < 2, no_channels = []; end
 if isempty(no_channels), no_channels = 1; end
 if nargin < 3, file_index = []; end
@@ -65,7 +66,7 @@ sentence.features = features;
 
 %% Getting list of phones/words and transition times.
 
-phone_fid = fopen([sentence_dir, file_name, '.PHN']);
+phone_fid = fopen([sentence_dir, file_name, '.tsylbPHN']);
 
 phone_data = textscan(phone_fid, '%d%d%s');
 phone_starts = round(100*phone_data{1}/16);

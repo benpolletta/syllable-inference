@@ -1,7 +1,9 @@
-function results = phoneData(SI)
+function results = phoneData(SI, tsylb_flag)
 
 if nargin < 1, SI = []; end
 if isempty(SI), SI = (1:6300)/6300; end
+if nargin < 2, tsylb_flag = []; end
+if isempty(tsylb_flag), tsylb_flag = 0; end
 
 time = 0:.1:10000;
 
@@ -17,10 +19,10 @@ sentence_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
 file_list_id = fopen([sentence_dir, 'DOC/allphonelist_filenames.txt'], 'r');
 file_list = textscan(file_list_id, '%s');
 fclose(file_list_id);
+    
+file_list = file_list{1};
 
 for s = 1:length(SI)
-    
-    file_list = file_list{1};
     
     file_index = SI(s);
     
@@ -33,7 +35,11 @@ for s = 1:length(SI)
     
     %% Retrieving phonemes and their start and end times.
     
-    phone_filename = [sentence_dir, file_name, '.PHN'];
+    if tsylb_flag
+        phone_filename = [sentence_dir, file_name, '.tsylbPHN'];
+    else
+        phone_filename = [sentence_dir, file_name, '.PHN'];
+    end
     fid = fopen(phone_filename, 'r');
     phone_data = textscan(fid, '%s');
     fclose(fid);
@@ -74,7 +80,7 @@ phone_vec = cat(2, results.phones)';
 
 %% Getting list of phonemes used in TIMIT.
 
-[timit_phonemes, class_indicator, class_names] = getTIMITphones;
+[tsylb_phonemes, class_indicator, class_names] = getTIMITphones(tsylb_flag); % The argument retrieves tsylb-compatible phonemes.
 
 %% Collecting phone lengths across sentences.
 
@@ -84,11 +90,18 @@ phone_vec = cat(2, results.phones)';
 
 %%% Converting from group_id order to timit_phonemes order.
 
-timit2group = cellfun(@(x) strcmp(x, group_id), timit_phonemes, 'unif', 0);
-timit2group_mat = cat(2, timit2group{:});
+tsylb2group = cellfun(@(x) strcmp(x, group_id), tsylb_phonemes, 'unif', 0);
+tsylb2group_mat = cat(2, tsylb2group{:});
 
-present_phonemes = timit_phonemes;
-present_phonemes(sum(timit2group_mat) == 0) = [];
+present_phonemes = tsylb_phonemes;
+if ~isempty(find(sum(tsylb2group_mat') == 2))
+    repeat_index = find(strcmp(present_phonemes, group_id(sum(tsylb2group_mat') == 2)), 1, 'last');
+else
+    repeat_index = [];
+end
+zero_index = find(sum(tsylb2group_mat) == 0);
+present_phonemes([repeat_index, zero_index]) = [];
+class_indicator([repeat_index, zero_index], :) = 0;
 
 present2group = cellfun(@(x) strcmp(x, group_id), present_phonemes, 'unif', 0);
 present2group_mat = cat(2, present2group{:});
@@ -98,17 +111,21 @@ phone_index = present_map(group_index);
 
 %%% Grouping by phoneme class.
 
-[timit_map, ~] = find(timit2group_mat');
+%[tsylb_map, ~] = find(tsylb2group_mat');
 [class_map, ~] = find(class_indicator');
 
-class_index = class_map(timit_map(group_index));
+class_index = class_map(present_map(group_index));
 
 no_bins = ceil(sqrt(length(SI)));
 
 vecs = {phone_length_vec, norm_phone_length_vec};
 indices = {phone_index, class_index};
 ids = {present_phonemes, class_names};
-vec_labels = {'phone', 'normPhone'};
+if tsylb_flag
+    vec_labels = {'tsylbPhone', 'normTsylbPhone'};
+else
+    vec_labels = {'phone', 'normPhone'};
+end
 index_labels = {'', 'Class'};
 no_skipped = [3 1];
 
