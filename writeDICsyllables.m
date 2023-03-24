@@ -1,4 +1,5 @@
 function results = writeDICsyllables
+% Record syllabifications for words in the lexicon (i.w., in TIMITDIC.txt).
 
 timit_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
 
