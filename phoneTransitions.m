@@ -1,20 +1,30 @@
-function [count, results] = phoneTransitions(SI)
+function [count, results] = phoneTransitions(SI, tsylb_option)
 
 if nargin < 1, SI = []; end
 if isempty(SI), SI = (1:6300)/6300; end
+if nargin < 2, tsylb_option = []; end
+if isempty(tsylb_option), tsylb_option = 0; end
 
 time = 0:.1:10000;
 
 onset_time = 1000;
 
-name = 'phoneTransitions';
+if tsylb_option
+    phone_prefix = 'tsylbPhone';
+    phone_suffix = '.tsylbPHN';
+else
+    phone_prefix = 'phone';
+    phone_suffix = '.PHN';
+end
+
+name = [phone_prefix, 'Transitions'];
 if length(SI) ~= 6300
     name = sprintf('%s_%dsentences', name, length(SI));
 end
 
-[tsylb_phonemes, class_indicator, class_names] = getTIMITphones(1);
+[phonemes, class_indicator, class_names] = getPhones(tsylb_option);
 
-num_phones = length(tsylb_phonemes);
+num_phones = length(phonemes);
 
 count = zeros(num_phones);
 
@@ -42,7 +52,7 @@ for s = 1:length(SI)
     
     %% Retrieving phonemes and their start and end times.
     
-    phone_filename = [timit_dir, file_name, '.PHN'];
+    phone_filename = [timit_dir, file_name, phone_suffix];
     fid = fopen(phone_filename, 'r');
     phone_data = textscan(fid, '%s');
     fclose(fid);
@@ -59,8 +69,8 @@ for s = 1:length(SI)
     
     for p = 1:(length(phones) - 1)
         
-        this_index = find(strcmp(tsylb_phonemes, phones{p}));
-        next_index = find(strcmp(tsylb_phonemes, phones{p + 1}));
+        this_index = find(strcmp(phonemes, phones{p}));
+        next_index = find(strcmp(phonemes, phones{p + 1}));
         count(next_index, this_index) = count(next_index, this_index) + 1;
         
     end
@@ -81,11 +91,11 @@ class_prob = class_count/num_transitions;
 
 prob = count/num_transitions;
 
-save([name, '.mat'], 'results', 'tsylb_phonemes', 'count', 'prob', 'class_names', 'class_count', 'class_prob')
+save([name, '.mat'], 'results', 'phonemes', 'count', 'prob', 'class_names', 'class_count', 'class_prob')
 
-plotTransitions([name, '_Counts'], 'Phoneme Transition Counts', tsylb_phonemes, count)
+plotTransitions([name, '_Counts'], 'Phoneme Transition Counts', phonemes, count)
 
-plotTransitions([name, '_Prob'], 'Phoneme Transition Probabilities (col.)', tsylb_phonemes, nanunitsum(count))
+plotTransitions([name, '_Prob'], 'Phoneme Transition Probabilities (col.)', phonemes, nanunitsum(count))
 
 plotTransitions([name,'_CountsByClass'], 'Class Transition Counts', class_names, class_count)
 
