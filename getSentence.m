@@ -88,6 +88,7 @@ word_ends = round(100*word_data{2}/16);
 word_transition_times = time(sort(unique([word_starts; word_ends]))+1);
 words = word_data{3};
 
+sentence.word_sequence = words;
 
 %% Constructing time series of feature vectors.
 

@@ -80,7 +80,7 @@ phone_vec = cat(2, results.phones)';
 
 %% Getting list of phonemes used in TIMIT.
 
-[tsylb_phonemes, class_indicator, class_names] = getTIMITphones(tsylb_flag); % The argument retrieves tsylb-compatible phonemes.
+[tsylb_phonemes, class_indicator, class_names] = getPhones(tsylb_flag); % The argument retrieves tsylb-compatible phonemes.
 
 %% Collecting phone lengths across sentences.
 
@@ -90,16 +90,16 @@ phone_vec = cat(2, results.phones)';
 
 %%% Converting from group_id order to timit_phonemes order.
 
-tsylb2group = cellfun(@(x) strcmp(x, group_id), tsylb_phonemes, 'unif', 0);
-tsylb2group_mat = cat(2, tsylb2group{:});
+get2group = cellfun(@(x) strcmp(x, group_id), tsylb_phonemes, 'unif', 0);
+get2group_mat = cat(2, get2group{:});
 
 present_phonemes = tsylb_phonemes;
-if ~isempty(find(sum(tsylb2group_mat') == 2))
-    repeat_index = find(strcmp(present_phonemes, group_id(sum(tsylb2group_mat') == 2)), 1, 'last');
+if ~isempty(find(sum(get2group_mat') == 2))
+    repeat_index = find(strcmp(present_phonemes, group_id(sum(get2group_mat') == 2)), 1, 'last');
 else
     repeat_index = [];
 end
-zero_index = find(sum(tsylb2group_mat) == 0);
+zero_index = find(sum(get2group_mat) == 0);
 present_phonemes([repeat_index, zero_index]) = [];
 class_indicator([repeat_index, zero_index], :) = 0;
 
