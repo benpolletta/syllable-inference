@@ -1,19 +1,21 @@
-function sentence = getSentence(time, no_channels, file_index, onset, transition_factor, lowfreq, highfreq, norm)
+function sentence = getSentence(time, file_index, tsylb_option, no_channels, onset, transition_factor, lowfreq, highfreq, norm)
 
 if nargin == 0, time = (0:.01:6000)/1000; fs = 10^5;
 else, fs = length(time)/max(time); end
-if nargin < 2, no_channels = []; end
+if nargin < 2, file_index = []; end
+if nargin < 3, tsylb_option = []; end
+if isempty(tsylb_option), tsylb_option = 1; end
+if nargin < 4, no_channels = []; end
 if isempty(no_channels), no_channels = 1; end
-if nargin < 3, file_index = []; end
-if nargin < 4, onset = []; end
+if nargin < 5, onset = []; end
 if isempty(onset), onset = 0; end
-if nargin < 5, transition_factor = []; end
+if nargin < 6, transition_factor = []; end
 if isempty(transition_factor), transition_factor = .1; end
-if nargin < 6, lowfreq = []; end
+if nargin < 7, lowfreq = []; end
 if isempty(lowfreq), lowfreq = 0; end
-if nargin < 7, highfreq = []; end
+if nargin < 8, highfreq = []; end
 if isempty(highfreq), highfreq = inf; end
-if nargin < 8, norm = []; end
+if nargin < 9, norm = []; end
 if isempty(norm), norm = 0; end
 
 nsltools_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/nsltools/'; addpath(genpath(nsltools_dir))
@@ -44,21 +46,23 @@ feature_names = {'vowel', 'open', 'front', 'round', 'dipthong', 'rhoticized', 'p
 feature_dim = length(feature_names);
 sentence.feature_names = feature_names;
 
-format = '%s';
-for i = 1:feature_dim, format = [format, '%f']; end
+if tsylb_option
 
-phone2feature_fid = fopen([panphon_dir, 'timit_to_mfa.txt']); %'timit_features.txt']);
-phone2feature_data = textscan(phone2feature_fid, format);
-fclose(phone2feature_fid)
+    phone2feature_name = 'tsylbPhones2features.mat';
+    phone_suffix = '.tsylbPHN';
 
-phone_list = phone2feature_data{1};
-feature_mat = [phone2feature_data{2:end}];
+else
 
-unique_phones = unique(phone_list);
+    phone2feature_name = 'phones2features.mat';
+    phone_suffix = '.PHN';
 
-for u = 1:length(unique_phones)
-    features{u} = feature_mat(strcmpi(phone_list, unique_phones{u}), :);
 end
+
+phone2feature_data = load(phone2feature_name);
+
+unique_phones = phone2feature_data.unique_phones;
+feature_mat = phone2feature_data.feature_mat;
+features = phone2feature_data.features;
 
 sentence.phone_list = unique_phones;
 sentence.feature_mat = feature_mat;
@@ -66,7 +70,7 @@ sentence.features = features;
 
 %% Getting list of phones/words and transition times.
 
-phone_fid = fopen([sentence_dir, file_name, '.tsylbPHN']);
+phone_fid = fopen([sentence_dir, file_name, phone_suffix]);
 
 phone_data = textscan(phone_fid, '%d%d%s');
 phone_starts = round(100*phone_data{1}/16);
@@ -84,69 +88,26 @@ word_ends = round(100*word_data{2}/16);
 word_transition_times = time(sort(unique([word_starts; word_ends]))+1);
 words = word_data{3};
 
-num_words = length(words);
 
-sentence.word_transition_times = word_transition_times;
-sentence.word_sequence = words;
-
-%% Constructing specific feature & transition matrices for this sentence (adding extra transitions for paired feature vectors).
+%% Constructing time series of feature vectors.
 
 this_phone_list = phones;
 this_feature_mat = nan(num_phones, feature_dim);
+
+feature_vec = zeros(length(time), feature_dim);
+
+prev_transition = phone_transition_times(1);
+prev_features = this_feature_mat(1, :);
 
 phone_index = 1;
 
 for p = 1:num_phones
     
     this_phone = phones{p};
-    this_feature = features{strcmpi(unique_phones, this_phone)};
-    this_feature_dim = size(this_feature, 1);
+    these_features = unique(features{strcmpi(unique_phones, this_phone)}, 'rows');
+    this_feature_dim = size(these_features, 1);
+    prev_feature_dim = size(prev_features, 1);
     
-    if this_feature_dim == 1
-        
-        this_feature_mat(phone_index, :) = this_feature;
-        
-    elseif this_feature_dim == 2
-        
-%         if strcmp(this_phone, 'NX')
-%             
-%             % Find containing word.
-%             
-%             this_word = 
-%             
-%             
-%         else
-            
-            this_phone_list((phone_index + 2):(end + 1)) = this_phone_list((phone_index + 1):end);
-            this_phone_list(phone_index:(phone_index + 1)) = {this_phone(1), this_phone(2)};
-            
-            phone_transition_times((phone_index + 2):(end + 1)) = phone_transition_times((phone_index + 1):end);
-            phone_transition_times(phone_index + 1) = mean(phone_transition_times(phone_index:(phone_index + 1)));
-            
-            this_feature_mat(phone_index:(phone_index + 1), :) = this_feature;
-            
-%         end
-        
-    end
-    
-    phone_index = phone_index + this_feature_dim;
-    
-end
-
-sentence.phone_transition_times = phone_transition_times;
-sentence.phone_sequence = this_phone_list;
-
-%% Constructing time series of feature vectors.
-
-feature_vec = zeros(length(time), feature_dim);
-
-prev_transition = phone_transition_times(1);
-prev_feature = this_feature_mat(1, :);
-
-for p = 1:length(this_phone_list)
-    
-    %this_phone = this_phone_list{p};
-    this_feature = this_feature_mat(p, :);
     this_start = phone_transition_times(p);
     this_end = phone_transition_times(p + 1);
     this_duration = this_end - this_start;
@@ -158,18 +119,54 @@ for p = 1:length(this_phone_list)
     
     transition_indicator = time > prev_transition & time <= first_transition;
     sustain_indicator = time > first_transition & time <= final_transition;
-    
-    if sum(transition_indicator) > 0
-        transition_path = ((time(transition_indicator) - prev_transition)'*this_feature + (first_transition - time(transition_indicator))'*prev_feature)/(first_transition - prev_transition);
-        feature_vec(transition_indicator, :) = transition_path;
+
+    if this_feature_dim == 1 && prev_feature_dim == 1
+
+        if sum(transition_indicator) > 0
+
+            transition_path = ((time(transition_indicator) - prev_transition)'*these_features + (first_transition - time(transition_indicator))'*prev_features)/(first_transition - prev_transition);
+            feature_vec(transition_indicator, :) = transition_path;
+
+        end
+
+        feature_vec(sustain_indicator, :) = repmat(these_features, sum(sustain_indicator), 1);
+
+    else
+
+        [transition_f_choice, ~] = find(mnrnd(1, ones(1, this_feature_dim*prev_feature_dim)/(this_feature_dim*prev_feature_dim), sum(transition_indicator))');
+        [sustain_f_choice, ~] = find(mnrnd(1, ones(1, this_feature_dim)/this_feature_dim, sum(sustain_indicator))');
+
+        for f = 1:this_feature_dim
+
+            for p = 1:prev_feature_dim
+
+                this_choice = (f - 1)*prev_feature_dim + p;
+
+                transition_path = ((time(transition_indicator) - prev_transition)'*these_features(f, :) + (first_transition - time(transition_indicator))'*prev_features(p, :))/(first_transition - prev_transition);
+                
+                transition_index = transition_indicator;
+                transition_index(transition_indicator) = transition_f_choice == this_choice;
+                
+                feature_vec(transition_index, :) = transition_path(transition_f_choice == this_choice, :);
+
+            end
+
+            sustain_index = sustain_indicator;
+            sustain_index(sustain_indicator) = sustain_f_choice == f;
+            
+            feature_vec(sustain_index, :) = repmat(these_features(f, :), sum(sustain_index), 1);
+
+        end
+        
     end
-    
-    feature_vec(sustain_indicator, :) = repmat(this_feature, sum(sustain_indicator), 1);
-    
+
     prev_transition = final_transition;
-    prev_feature = this_feature;
+    prev_features = these_features;
+    
 end
 
+sentence.phone_transition_times = phone_transition_times;
+sentence.phone_sequence = this_phone_list;
 sentence.feature_vec = feature_vec;
 
 %% Adding noise to time series of feature vectors.
@@ -184,7 +181,7 @@ sentence.input_vec = input_vec;
 
 %% Plotting noise covariance & time series of input vectors.
 
-make_fig = 0;
+make_fig = 1;
 
 if make_fig == 1
     
@@ -197,6 +194,29 @@ if make_fig == 1
     
     % Input vector.
     figure
+
+    subplot(211)
+    
+    imagesc(time, 1:feature_dim, feature_vec')%*diag(1./max(feature_mat)))')
+    
+    hold on
+    
+    plot(repmat(phone_transition_times, 2, 1), repmat([0; size(input_vec, 1)], 1, length(phone_transition_times)), 'w', 'LineWidth', .5)
+    
+    xticks(phone_transition_times(1:(end - 1))+diff(phone_transition_times)/2)
+    xticklabels(this_phone_list)
+    xtickangle(45)
+    
+    xlim([min(phone_transition_times), max(phone_transition_times)])
+    
+    yticks(1:feature_dim)
+    yticklabels(feature_names)
+    
+    axis xy
+    
+    colorbar
+
+    subplot(212)
     
     imagesc(time, 1:feature_dim, input_vec')%*diag(1./max(feature_mat)))')
     
