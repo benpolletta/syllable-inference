@@ -1,10 +1,12 @@
-function posterior = calc_phone_posterior_new(likelihood, method)
+function posterior = calc_phone_posterior_new(likelihood, method, tsylb_option)
 
 if nargin < 2, method = ''; end
+if nargin < 3, tsylb_option = []; end
+if isempty(tsylb_option), tsylb_option = 1; end
 
 global stats
 
-stats = loadStats;
+stats = loadStats(tsylb_option);
 
 fields = fieldnames(likelihood);
 
@@ -32,6 +34,7 @@ phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.prob);
 trans_posterior(1) = eps;
 
 trans_lookback = 10; % In timesteps.
+% decay_time = 1000; % In timesteps.
 
 last_transition = 0;
 [last_transition_index, last_posterior_index] = deal(1);
@@ -51,6 +54,9 @@ for w = 2:length(time)
         phone_prior = phone_posterior(:, w - 1);
 
     end
+
+%     unif_phone_dist = nanunitsum(ones(size(phone_prior)));
+%     phone_prior = phone_prior + (unif_phone_dist - phone_prior)/decay_time;
 
     switch method
 

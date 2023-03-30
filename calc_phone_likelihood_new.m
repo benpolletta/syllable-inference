@@ -1,15 +1,21 @@
-function result = calc_phone_likelihood_new(sentence, window_length, method)
+function result = calc_phone_likelihood_new(sentence, window_length, method, tsylb_option)
 
 if nargin < 2, window_length = []; end
 if nargin < 3, method = []; end
+if nargin < 4, tsylb_option = []; end
 if isempty(window_length), window_length = 1000; end % 2501; end
 if isempty(method), method = 'ttest'; end
+if isempty(tsylb_option), tsylb_option = 1; end
 
 % phone_data = load('normPhoneData.mat');
 % phones = phone_data.id;
 % phone_prob = phone_data.prob;
+if tsylb_option
+    phone2feature_data = load('tsylbPhones2features.mat');
+else
+    phone2feature_data = load('phones2features.mat');
+end
 
-phone2feature_data = load('phones2features.mat');
 phone_list = phone2feature_data.phone_list;
 phone_features = phone2feature_data.feature_mat;
 

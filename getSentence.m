@@ -1,6 +1,7 @@
 function sentence = getSentence(time, file_index, tsylb_option, no_channels, onset, transition_factor, lowfreq, highfreq, norm)
 
-if nargin == 0, time = (0:.01:6000)/1000; fs = 10^5;
+if nargin == 0, time = []; end
+if isempty(time), time = (0:.01:6000)/1000; fs = 10^5;
 else, fs = length(time)/max(time); end
 if nargin < 2, file_index = []; end
 if nargin < 3, tsylb_option = []; end
@@ -20,22 +21,23 @@ if isempty(norm), norm = 0; end
 
 nsltools_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/nsltools/'; addpath(genpath(nsltools_dir))
 panphon_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/panphon/panphon/data/'; addpath(genpath(panphon_dir))
-sentence_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
+timit_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
 
-file_list_id = fopen([sentence_dir, 'wavFileList.txt'], 'r');
+file_list_id = fopen([timit_dir, 'DOC/allphonelist_filenames.txt'], 'r');
 file_list = textscan(file_list_id, '%s');
 fclose(file_list_id);
-
+    
 file_list = file_list{1};
 
 if isempty(file_index)
     file_index = round(rand*length(file_list));
 elseif isfloat(file_index) && file_index < 1 && file_index > 0
     file_index = round(file_index*length(file_list));
+elseif ischar(file_index)
+    file_index = strcmpi(file_list, file_index);
 end
 
-wavfile_name = file_list{file_index};
-file_name = extractBefore(wavfile_name, '.WAV');
+file_name = file_list{file_index};
 
 sentence = struct('filename', file_name);
 sentence.time = time;
@@ -70,17 +72,17 @@ sentence.features = features;
 
 %% Getting list of phones/words and transition times.
 
-phone_fid = fopen([sentence_dir, file_name, phone_suffix]);
+phone_fid = fopen([timit_dir, file_name, phone_suffix]);
 
 phone_data = textscan(phone_fid, '%d%d%s');
-phone_starts = round(100*phone_data{1}/16);
-phone_ends = round(100*phone_data{2}/16);
-phone_transition_times = time(sort(unique([phone_starts; phone_ends]))+1);
+phone_starts = time(round(100*phone_data{1}/16) + 1); % round(100*phone_data{1}/16);
+phone_ends = time(round(100*phone_data{2}/16) + 1); % round(100*phone_data{1}/16);
+phone_transition_times = [phone_starts; phone_ends]; % time(sort(unique([phone_starts; phone_ends]))+1);
 phones = phone_data{3};
 
 num_phones = length(phones);
 
-word_fid = fopen([sentence_dir, file_name, '.WRD']);
+word_fid = fopen([timit_dir, file_name, '.WRD']);
 
 word_data = textscan(word_fid, '%d%d%s');
 word_starts = round(100*word_data{1}/16);
@@ -97,7 +99,7 @@ this_feature_mat = nan(num_phones, feature_dim);
 
 feature_vec = zeros(length(time), feature_dim);
 
-prev_transition = phone_transition_times(1);
+prev_transition = phone_starts(1);
 prev_features = this_feature_mat(1, :);
 
 phone_index = 1;
@@ -109,8 +111,8 @@ for p = 1:num_phones
     this_feature_dim = size(these_features, 1);
     prev_feature_dim = size(prev_features, 1);
     
-    this_start = phone_transition_times(p);
-    this_end = phone_transition_times(p + 1);
+    this_start = phone_starts(p); % phone_transition_times(p);
+    this_end = phone_ends(p); % phone_transition_times(p + 1);
     this_duration = this_end - this_start;
     
     max_transition_length = this_duration*transition_factor;
@@ -182,7 +184,7 @@ sentence.input_vec = input_vec;
 
 %% Plotting noise covariance & time series of input vectors.
 
-make_fig = 1;
+make_fig = 0;
 
 if make_fig == 1
     
@@ -202,13 +204,13 @@ if make_fig == 1
     
     hold on
     
-    plot(repmat(phone_transition_times, 2, 1), repmat([0; size(input_vec, 1)], 1, length(phone_transition_times)), 'w', 'LineWidth', .5)
+    plot(repmat(phone_transition_times(:), 1, 2)', repmat([0; size(input_vec, 1)], 1, length(phone_transition_times(:))), 'w', 'LineWidth', .5)
     
-    xticks(phone_transition_times(1:(end - 1))+diff(phone_transition_times)/2)
+    xticks(phone_transition_times(1, :) + diff(phone_transition_times)/2)
     xticklabels(this_phone_list)
     xtickangle(45)
     
-    xlim([min(phone_transition_times), max(phone_transition_times)])
+    xlim([min(min(phone_transition_times)), max(max(phone_transition_times))])
     
     yticks(1:feature_dim)
     yticklabels(feature_names)
@@ -223,13 +225,13 @@ if make_fig == 1
     
     hold on
     
-    plot(repmat(phone_transition_times, 2, 1), repmat([0; size(input_vec, 1)], 1, length(phone_transition_times)), 'w', 'LineWidth', .5)
+    plot(repmat(phone_transition_times(:), 1, 2)', repmat([0; size(input_vec, 1)], 1, length(phone_transition_times(:))), 'w', 'LineWidth', .5)
     
-    xticks(phone_transition_times(1:(end - 1))+diff(phone_transition_times)/2)
+    xticks(phone_transition_times(1, :) + diff(phone_transition_times)/2)
     xticklabels(this_phone_list)
     xtickangle(45)
     
-    xlim([min(phone_transition_times), max(phone_transition_times)])
+    xlim([min(min(phone_transition_times)), max(max(phone_transition_times))])
     
     yticks(1:feature_dim)
     yticklabels(feature_names)

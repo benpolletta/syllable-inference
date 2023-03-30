@@ -88,13 +88,13 @@ axis xy
 
 hold on
 
-plot(plot_axis, repmat(phone_transition_times, 2, 1), repmat([0; size(input_vec, 1)], 1, length(phone_transition_times)), 'w', 'LineWidth', .5)
-
-xticks(phone_transition_times(1:(end - 1))+diff(phone_transition_times)/2)
+plot(repmat(phone_transition_times(:), 1, 2)', repmat([0; size(input_vec, 1)], 1, length(phone_transition_times(:))), 'w', 'LineWidth', .5)
+    
+xticks(phone_transition_times(1, :) + diff(phone_transition_times)/2)
 xticklabels(phone_sequence)
 xtickangle(45)
 
-xlim([min(phone_transition_times), max(phone_transition_times)])
+xlim([min(min(phone_transition_times)), max(max(phone_transition_times))])
 
 step = floor(feature_dim/10);
 yticks(1:step:feature_dim)
