@@ -14,9 +14,9 @@ if length(SI) ~= 6300
     name = sprintf('%s_%dsentences', name, length(SI));
 end
   
-sentence_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
+timit_dir = '/projectnb/crc-nak/brpp/Speech_Stimuli/timit/TIMIT/';
 
-file_list_id = fopen([sentence_dir, 'DOC/allphonelist_filenames.txt'], 'r');
+file_list_id = fopen([timit_dir, 'DOC/allphonelist_filenames.txt'], 'r');
 file_list = textscan(file_list_id, '%s');
 fclose(file_list_id);
     
@@ -36,9 +36,9 @@ for s = 1:length(SI)
     %% Retrieving phonemes and their start and end times.
     
     if tsylb_flag
-        phone_filename = [sentence_dir, file_name, '.tsylbPHN'];
+        phone_filename = [timit_dir, file_name, '.tsylbPHN'];
     else
-        phone_filename = [sentence_dir, file_name, '.PHN'];
+        phone_filename = [timit_dir, file_name, '.PHN'];
     end
     fid = fopen(phone_filename, 'r');
     phone_data = textscan(fid, '%s');
@@ -55,7 +55,7 @@ for s = 1:length(SI)
     
     %% Retrieving syllable boundary_times & normalizing phone lengths.
     
-    sylb_filename = [sentence_dir, file_name, '.SYLB'];
+    sylb_filename = [timit_dir, file_name, '.SYLB'];
     fid = fopen(sylb_filename, 'r');
     tsylb_indices = textscan(fid, '%d %d %s');
     fclose(fid);
