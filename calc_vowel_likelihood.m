@@ -46,9 +46,19 @@ for w = 1:num_windows
 
 end
 
+[v_peak, v_avg, v_std] = ThresholdingAlgo(diff(diff(v_stats)), 7, 4, 0.25);
+v_indicator = v_peak == -1;
+
+indicator_time = time(1:end - 1) + diff(time)/2;
+indicator_time = indicator_time(1:end - 1) + diff(indicator_time)/2;
+
 result.time = time;
 result.vowel_vec = vowel_vec;
 result.vowel_likelihood = v_stats;
+result.indicator_time = indicator_time;
+result.v_indicator = v_indicator;
+result.v_avg_filter = v_avg;
+result.v_std_filter = v_std;
 result.mu_v = mu_v;
 result.sigma_v = sigma_v;
     

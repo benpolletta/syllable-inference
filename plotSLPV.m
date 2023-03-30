@@ -18,9 +18,13 @@ vowel_lh = calc_vowel_likelihood(sentence, vowel_window);
 scaled_vl = (vowel_lh.vowel_likelihood - min(vowel_lh.vowel_likelihood))*(length(vowel_lh.feature_names)/range(vowel_lh.vowel_likelihood));
 plot(gca, vowel_lh.time, scaled_vl, 'w', 'LineWidth', 0.5)
 
-D_vowel_lh = diff(vowel_lh.vowel_likelihood);
-scaled_dvl = (D_vowel_lh - min(D_vowel_lh))*(length(vowel_lh.feature_names)/range(D_vowel_lh));
-plot(gca, vowel_lh.time(1:(end - 1)) + diff(vowel_lh.time)/2, scaled_dvl, 'y', 'LineWidth', 0.5)
+D2_vowel_lh = diff(diff(vowel_lh.vowel_likelihood));
+scaled_dvl = (D2_vowel_lh - min(D2_vowel_lh))*(length(vowel_lh.feature_names)/range(D2_vowel_lh));
+plot(gca, vowel_lh.indicator_time, scaled_dvl, 'w--', 'LineWidth', 0.5)
+
+vowel_ind = vowel_lh.v_indicator;
+scaled_vi = (vowel_ind - min(vowel_ind))*(length(vowel_lh.feature_names)/range(vowel_ind));
+plot(gca, vowel_lh.indicator_time, scaled_vi, 'y', 'LineWidth', 0.5)
 
 window_length = 500; % 2501;
 

@@ -1,4 +1,11 @@
 function [signals,avgFilter,stdFilter] = ThresholdingAlgo(y,lag,threshold,influence)
+if nargin < 2, lag = []; end
+if nargin < 3, threshold = []; end
+if nargin < 4, influence = []; end
+if isempty(lag), lag = 10; end
+if isempty(threshold), threshold = 3; end
+if isempty(influence), influence = .25; end
+
 % Initialise signal results
 signals = zeros(length(y),1);
 % Initialise filtered series
