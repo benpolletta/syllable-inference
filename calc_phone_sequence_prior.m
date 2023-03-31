@@ -1,4 +1,4 @@
-function result = calc_phone_sequence_prior(phone_sequence)
+function prior = calc_phone_sequence_prior(phone_sequence)
 
 phone_data = load('normPhoneData.mat');
 phones = phone_data.id;
