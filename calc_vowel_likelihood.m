@@ -46,8 +46,9 @@ for w = 1:num_windows
 
 end
 
-[v_peak, v_avg, v_std] = ThresholdingAlgo(diff(diff(v_stats)), 7, 4, 0.25);
-v_indicator = v_peak == -1;
+[v_peak, v_avg, v_std] = ThresholdingAlgo(v_stats, 5, 3, 0.25);
+[d2v_peak, d2v_avg, d2v_std] = ThresholdingAlgo(diff(diff(v_stats)), 5, 3, 0.25);
+v_indicator = d2v_peak == -1 & v_peak(2:end - 1) == 1;
 
 indicator_time = time(1:end - 1) + diff(time)/2;
 indicator_time = indicator_time(1:end - 1) + diff(indicator_time)/2;

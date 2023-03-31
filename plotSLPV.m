@@ -71,6 +71,9 @@ plot(gca, likelihood.time, scaled_t3, 'w', 'LineWidth', 0.5)
 scaled_h = (posterior.hazard_est - min(posterior.hazard_est))*(length(likelihood.phones)/range(posterior.hazard_est));
 plot(gca, likelihood.time, scaled_h, 'y', 'LineWidth', 0.5)
 
+scaled_hv = (posterior.hazard_var - min(posterior.hazard_var))*(length(likelihood.phones)/range(posterior.hazard_var));
+plot(gca, likelihood.time, scaled_hv, 'y--', 'LineWidth', 0.5)
+
 scaled_ie = (posterior.inv_entropy - min(posterior.inv_entropy))*(length(likelihood.phones)/range(posterior.inv_entropy));
 plot(gca, likelihood.time, scaled_ie, 'w--', 'LineWidth', 0.5)
 
