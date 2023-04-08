@@ -35,11 +35,12 @@ dict_sylbs = {dict(:).sylb_cell};
 
 word_results = load('wordData_results.mat');
 word_results = word_results.results;
-canonical_words = {word_results(:).canonical_words};
+canonical_words = load('canonicalWords.mat');
+canonical_words = {canonical_words.results(:).canonical_words};
 
 ncsn_fid = fopen([timit_dir, 'DOC/non_canonical_sylb_num.txt'], 'w');
 
-if reuse_results & exist('sylbData_results.mat') == 2
+if reuse_results && exist('sylbData_results.mat') == 2
 
     sylb_data = load('sylbData_results.mat');
 
@@ -70,41 +71,21 @@ else
         sylb_filename = [timit_dir, file_name, '.SYLB'];
         [sylbs, sylb_times, sylb_durations] = getUnits(sylb_filename);
 
-        syllabic_rate = 1000/mean(sylb_durations);
+        norm_sylb_durations = double(sylb_durations)/mean(double(sylb_durations));
+        syllabic_rate = 1000/mean(double(sylb_durations));
 
+        sylb_phones = wsp_map(s).sylb_phone_cell;
         word_sylbs = wsp_map(s).word_sylb_cell;
 
-        canonicalSylbs = cell(size(word_sylbs));
-
-        for w = 1:length(words)
-
-            %% Finding canonical pronunciations.
-
-            dictIndex = strcmp(these_cw{w}, dict_words);
-            dictSylbs = dict_sylbs{dictIndex};
-
-            if length(dictSylbs) == length(word_sylbs{w})
-
-                canonicalSylbs{w} = dictSylbs;
-
-            elseif all(strcmp(dictSylbs, 'y/ih/r'))
-
-                canonicalSylbs{w} = word_sylbs{w};
-                
-            else
-
-                fprintf(ncsn_fid, '%s %s %s\n', file_name, strjoin(dictSylbs(:), '*'), strjoin(word_sylbs{w}, '*'));
-
-            end
-
-        end
-
+        canonicalSylbs = wsp_map(s).canonical_sylbs;
         canonicalSylbs = cat(2, canonicalSylbs{:})';
 
         %% Saving results.
 
         results(s) = struct('sylb_durations', sylb_durations, 'syllabic_rate', syllabic_rate,...
-            'phone_durations', phone_durations, 'canonicalSylbs', {canonicalSylbs}, 'sylbs', {sylbs}, 'phones', {phones});
+            'norm_sylb_durations', sylb_durations/mean(sylb_durations), ...
+            'phone_durations', phone_durations, 'canonicalSylbs', {canonicalSylbs}, ...
+            'sylbs', {sylbs}, 'phones', {phones}, 'sylb_phones', {sylb_phones});
 
     end
 
@@ -114,19 +95,43 @@ end
 
 fclose(ncsn_fid);
 
+%% Plotting syllabic rate distribution.
+
+syllabic_rate = [results(:).syllabic_rate];
+syllable_count = cellfun(@length, {results(:).sylbs});
+all_durations = cat(1, results.sylb_durations);
+
+id = 'Syllable Duration';
+
+[hist, bins] = histcounts(all_durations, 'Normalization', 'probability', 'BinMethod', 'sqrt');
+
+bin_centers = bins(:, 1:(end - 1)) + diff(bins, [], 2)/2;
+bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
+    bin_centers, bin_centers(:, end) + mean(diff(bins, [], 2), 2)];
+
+hist = [zeros(size(hist(:, 1))), hist, zeros(size(hist(:, end)))];
+
+fname = ['sylDuration', name, '_prob'];
+        
+plotIndividualizedHistograms(fname, {id}, {bin_centers'}, {hist'})
+
 %% Collecting syllable lengths across sentences.
 
 all_sylbs = cat(1, results.sylbs);
 
-phoneno_vec = cellfun(@length, all_sylbs);
+canonical_sylbs = cat(1, results.canonicalSylbs);
 
-firstphone_vec = cellfun(@(x) x{1}, all_sylbs, 'unif', 0);
+all_sylb_phones = cat(2, results.sylb_phones);
 
-string_vec = cellfun(@(x) strjoin(x, '/'), all_sylbs, 'unif', 0);
+phoneno_vec = cellfun(@length, all_sylb_phones)';
 
-duration_vec = cat(1, results.sylb_lengths);
+firstphone_vec = cellfun(@(x) x{1}, all_sylb_phones, 'unif', 0)';
 
-norm_duration_vec = cat(1, results.norm_sylb_lengths);
+%string_vec = cellfun(@(x) strjoin(x, '/'), all_sylbs, 'unif', 0);
+
+duration_vec = cat(1, results.sylb_durations);
+
+norm_duration_vec = cat(1, results.norm_sylb_durations);
 
 %% Plotting durations by syllable and syllable length (i.e., number of phones).
 
@@ -134,11 +139,13 @@ no_bins = ceil(sqrt(length(SI)));
 
 vecs = {duration_vec, norm_duration_vec};
 
-syl_grouping_vars = {string_vec, phoneno_vec, firstphone_vec};
+syl_grouping_vars = {all_sylbs, canonical_sylbs, phoneno_vec, firstphone_vec};
 
-syl_grouping_labels = {'', 'PhoneNum', 'FirstPhone'};
+syl_grouping_labels = {'', 'Canon', 'PhoneNum', 'FirstPhone'};
 
 vec_labels = {'syl', 'normSyl'};
+
+sort_option = [1 1 0 0];
 
 for v = 1:length(vecs)
     
@@ -150,42 +157,19 @@ for v = 1:length(vecs)
         
         %%% Getting statistics & computing histograms.
         
-        [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vecs{v}, index, id, no_bins, fname);
+        [count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(double(vecs{v}), index, id, no_bins, fname);
         
-        figure()
-        plot(1:length(id), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
-        set(gca, 'XTick', 1:length(id), 'XTickLabel', id)
-        xtickangle(45)
-        axis tight
-        title('Syllable Distribution')
-        ylabel('Probability')
+        plotProbability(prob, id, sort_option(g))
         
-        saveas(gcf, [fname, '.fig'])
+        saveas(gcf, [fname, '_prob.fig'])
         
         plotHistograms(fname, id, bin_centers', hist')
+
+        % plotIndividualizedHistograms(fname, id, bin_centers_cell, hist_cell)
         
     end
     
 end
-
-end
-
-function [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vec, index, id, no_bins, fname)
-
-count = splitapply(@(x) length(x), vec, index);
-prob = count/sum(count);
-stats = splitapply(@(x) [mean(x), std(x), quantile(x, [.5, .25, .75])], vec, index);
-cdf = splitapply(@(x){[sort(x), linspace(0, 1, length(x))']}, vec, index);
-
-[hist, bins] = splitapply(@(x) histcounts(x, no_bins, 'Normalization', 'probability'), vec, index);
-
-bin_centers = bins(:, 1:(end - 1)) + diff(bins, [], 2)/2;
-bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
-    bin_centers, bin_centers(:, end) + mean(diff(bins, [], 2), 2)];
-
-hist = [zeros(size(hist(:, 1))), hist, zeros(size(hist(:, end)))];
-
-save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bin_centers')
 
 end
 
@@ -202,9 +186,86 @@ fclose(fid);
 units = data{3}; % (3, :);
 
 indices = cell2mat(data(1:2)); % cellfun(@str2num, data(1:2, :))';
-times = (indices/16 + onset_time);
+times = (double(indices)/16 + onset_time);
 
 lengths = diff(times, [], 2);
+
+end
+
+function [count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(vec, index, id, no_bins, fname)
+
+count = splitapply(@(x) length(x), vec, index);
+prob = count/sum(count);
+stats = splitapply(@(x) [mean(x), std(x), quantile(x, [.5, .25, .75])], vec, index);
+cdf = splitapply(@(x) {[sort(x), linspace(0, 1, length(x))']}, vec, index);
+
+[hist, bins] = splitapply(@(x) histcounts(x, no_bins, 'Normalization', 'probability'), vec, index); % no_bins, 'Normalization', 'probability'), vec, index);
+
+bin_centers = bins(:, 1:(end - 1)) + diff(bins, [], 2)/2;
+bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
+    bin_centers, bin_centers(:, end) + mean(diff(bins, [], 2), 2)];
+
+hist = [zeros(size(hist(:, 1))), hist, zeros(size(hist(:, end)))];
+
+[hist_cell, bins_cell] = arrayfun(@(i) histcounts(vec(index == i), 'Normalization', 'probability', 'BinMethod', 'sqrt'), min(index):max(index), 'UniformOutput', false);
+
+bin_centers_cell = cellfun(@(x) x(:, 1:(end - 1)) + diff(x, [], 2)/2, bins_cell, 'unif', 0);
+bin_centers_cell = cellfun(@(x,y) [x(:, 1) - mean(diff(y, [], 2), 2), x, x(:, end) + mean(diff(y, [], 2), 2)], bin_centers_cell, bins_cell, 'unif', 0);
+
+hist_cell = cellfun(@(x) [zeros(size(x(:, 1))), x, zeros(size(x(:, end)))], hist_cell, 'unif', 0);
+
+save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bin_centers', 'hist_cell', 'bins_cell', 'bin_centers_cell')
+
+end
+
+function plotProbability(prob, ids, sort_option)
+
+if sort_option
+    [prob, sort_order] = sort(prob, 'descend');
+    ids = ids(sort_order);
+end
+
+x_tick_step = round(length(ids)/10);
+these_x_ticks = 1:x_tick_step:length(ids);
+
+figure()
+
+if sort_option
+    semilogy(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+else
+    plot(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+end
+set(gca, 'XTick', these_x_ticks, 'XTickLabel', ids(these_x_ticks))
+xtickangle(45)
+axis tight
+title('Syllable Distribution')
+ylabel('Probability')
+
+end
+
+function plotIndividualizedHistograms(fname, id, bin_centers, hist)
+
+figure
+hold on
+legend('-DynamicLegend')
+
+colors = flipud(hsv(length(id)));
+
+set(gca, 'NextPlot', 'add', 'ColorOrder', colors)
+
+for i = 1:length(id)
+
+    plot(bin_centers{i}, hist{i}, 'LineWidth', 2, 'DisplayName', id{i})
+
+end
+
+legend(id)
+
+axis tight
+
+title('Syllable Duration Distribution')
+
+saveas(gcf, [fname, '_line.fig'])
 
 end
 
@@ -228,9 +289,9 @@ title('Syllable Duration Distribution')
 
 nochange_colorbar(gca)
 
-saveas(gcf, [name, '.fig'])
+saveas(gcf, [name, '_hist.fig'])
 
-save_as_pdf(gcf, name)
+% save_as_pdf(gcf, [name, '_hist'])
 
 figure
 
@@ -252,8 +313,8 @@ axis tight
 
 title('Syllable Duration Distribution')
 
-saveas(gcf, [name, '_line.fig'])
+saveas(gcf, [name, '_histLine.fig'])
 
-save_as_pdf(gcf, [name, '_line'])
+% save_as_pdf(gcf, [name, '_histLine'])
 
 end

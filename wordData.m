@@ -68,77 +68,12 @@ else
 
         norm_word_durations = double(word_durations)/mean(double(sylb_durations));
 
-        %         %% Finding canonical words.
-        %
-        %         canonical_words = cell(size(words));
-        %
-        %         for w = 1:length(words)
-        %
-        %             if any(strcmp(words{w}, dict_words))
-        %
-        %                 canonical_words{w} = dict_words(strcmp(words{w}, dict_words));
-        %
-        %             else
-        %
-        %                 possible_words = dict_words(contains(dict_words, words{w}));
-        %
-        %                 if length(possible_words) == 1
-        %
-        %                     canonical_words(w) = possible_words(:);
-        %
-        %                 else
-        %
-        %                     sentence = strjoin(words, ' ');
-        %
-        %                     amb_index = find(strcmp(words{w}, ambiguous_words) & strcmp(sentence, ambiguous_sentences));
-        %
-        %                     if ~isempty(amb_index)
-        %
-        %                         canonical_words(w) = resolutions(amb_index);
-        %
-        %                     else
-        %
-        %                         ambiguous_words(end + 1) = words(w);
-        %
-        %                         ambiguous_sentences(end + 1) = {sentence};
-        %
-        %                         prompt = sprintf('No unique match for %s in sentence\n ''%s'' \n is found in TIMITDIC. Possible matches are:\n %s.\n Please enter the index of the correct word:\n',words{w}, strjoin(words, ' '), strjoin(possible_words, ', '));
-        %
-        %                         index = input(prompt);
-        %
-        %                         [canonical_words(w), resolutions(end + 1)] = deal(possible_words(index));
-        %
-        %                     end
-        %
-        %                 end
-        %
-        %             end
-        %
-        %         end
-
         %% Writing pronunciations.
 
         pron_filename = [timit_dir, file_name, '.WRDpron'];
         fid = fopen(pron_filename, 'w');
 
         these_pronunciations = wsp_map(file_index).word_cell;
-
-        %         %% Adding in words with zero durations.
-        %         if any(word_durations == 0)
-        %
-        %             zero_duration_indices = find(word_durations == 0);
-        %
-        %             for i = 1:length(zero_duration_indices)
-        %
-        %                 these_pronunciations((zero_duration_indices(i):end) + 1) = these_pronunciations(zero_duration_indices(i):end);
-        %
-        %                 these_pronunciations{(zero_duration_indices(i))} = '';
-        %
-        %             end
-        %
-        %             wsp_map(file_index).word_cell = these_pronunciations;
-        %
-        %         end
 
         for_print = mat2cell(word_times, ones(size(word_times, 1), 1), [1 1]);
         for_print(:, end + 1) = these_pronunciations(:);
@@ -182,12 +117,12 @@ pron_vec = cat(2, wsp_map.word_cell)';
 % Grouping by length in syllables.
 
 sylb_num_id = mat2cell(min(word_sylb_num_vec):max(word_sylb_num_vec), 1, ones(1, range(word_sylb_num_vec) + 1));
-sylb_num_id = cellfun(@num2str, sylb_num_id, 'unif', 0)
+sylb_num_id = cellfun(@num2str, sylb_num_id, 'unif', 0);
 
 % Grouping by length in phones.
 
 phone_num_id = mat2cell(min(word_phone_num_vec):max(word_phone_num_vec), 1, ones(1, range(word_phone_num_vec) + 1));
-phone_num_id = cellfun(@num2str, phone_num_id, 'unif', 0)
+phone_num_id = cellfun(@num2str, phone_num_id, 'unif', 0);
 
 %% Finding number of pronunciations per word, & distribution over pronunciations.
 
@@ -203,6 +138,7 @@ no_bins = ceil(sqrt(length(SI)));
 vecs = {word_length_vec, norm_word_length_vec};
 indices = {word_index, word_sylb_num_vec + 1, word_phone_num_vec};
 ids = {word_id, sylb_num_id, phone_num_id};
+sort_option = {1, 0, 0};
 vec_labels = {'word', 'normWord'};
 index_labels = {'', 'NumSylbs', 'NumPhones'};
 no_skipped = [0 0 0];
@@ -211,17 +147,15 @@ for v = 1:length(vecs)
     for i = 1:length(indices)
         
         fname = [vec_labels{v}, index_labels{i}, name];
-        [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vecs{v}, indices{i}, ids{i}, no_bins, fname);
         
-        figure()
-        plot(1:length(ids{i}), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
-        set(gca, 'XTick', 1:length(ids{i}), 'XTickLabel', ids{i})
-        xtickangle(45)
-        axis tight
-        title('Word Distribution')
-        ylabel('Probability')
+        [count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(vecs{v}, indices{i}, ids{i}, no_bins, fname);
+        
+        plotProbability(prob, ids{i}, sort_option{i})
+        
         
         saveas(gcf, [fname, '_prob.fig'])
+
+        % save_as_pdf(gcf, [fname, '_prob'])
         
         plotHistograms(fname, ids{i}(1:(end - no_skipped(i))), bin_centers(1:(end - no_skipped(i)), :)', hist(1:(end - no_skipped(i)), :)')
         
@@ -254,9 +188,9 @@ function [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vec, ind
 count = splitapply(@(x) length(x), vec, index);
 prob = count/sum(count);
 stats = splitapply(@(x) [mean(x), std(x), quantile(x, [.5, .25, .75])], vec, index);
-cdf = splitapply(@(x){[sort(x), linspace(0, 1, length(x))']}, vec, index);
+cdf = splitapply(@(x) {[sort(x), linspace(0, 1, length(x))']}, vec, index);
 
-[hist, bins] = splitapply(@(x) histcounts(x, no_bins, 'Normalization', 'probability'), vec, index);
+[hist, bins] = splitapply(@(x) histcounts(x, no_bins, 'Normalization', 'probability'), vec, index); % no_bins, 'Normalization', 'probability'), vec, index);
 
 bin_centers = bins(:, 1:(end - 1)) + diff(bins, [], 2)/2;
 bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
@@ -264,7 +198,64 @@ bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
 
 hist = [zeros(size(hist(:, 1))), hist, zeros(size(hist(:, end)))];
 
-save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bin_centers')
+[hist_cell, bins_cell] = arrayfun(@(i) histcounts(vec(index == i), 'Normalization', 'probability', 'BinMethod', 'sqrt'), min(index):max(index), 'UniformOutput', false);
+
+bin_centers_cell = cellfun(@(x) x(:, 1:(end - 1)) + diff(x, [], 2)/2, bins_cell, 'unif', 0);
+bin_centers_cell = cellfun(@(x,y) [x(:, 1) - mean(diff(y, [], 2), 2), x, x(:, end) + mean(diff(y, [], 2), 2)], bin_centers_cell, bins_cell, 'unif', 0);
+
+hist_cell = cellfun(@(x) [zeros(size(x(:, 1))), x, zeros(size(x(:, end)))], hist_cell, 'unif', 0);
+
+save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bin_centers', 'hist_cell', 'bins_cell', 'bin_centers_cell')
+
+end
+
+function plotProbability(prob, ids, sort_option)
+
+if sort_option
+    [prob, sort_order] = sort(prob, 'descend');
+    ids = ids(sort_order);
+end
+
+x_tick_step = round(length(ids)/10);
+these_x_ticks = 1:x_tick_step:length(ids);
+
+figure()
+
+if sort_option
+    semilogy(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+else
+    plot(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+end
+set(gca, 'XTick', these_x_ticks, 'XTickLabel', ids(these_x_ticks))
+xtickangle(45)
+axis tight
+title('Word Distribution')
+ylabel('Probability')
+
+end
+
+function plotIndividualizedHistograms(fname, id, bin_centers, hist)
+
+figure
+hold on
+
+colors = flipud(hsv(length(id)));
+
+set(gca, 'NextPlot', 'add', 'ColorOrder', colors)
+
+for i = 1:length(id)
+
+    plot(bin_centers{i}, hist{i}, 'LineWidth', 2)
+
+end
+
+legend(id)
+
+axis tight
+
+title('Word Duration Distribution')
+
+saveas(gcf, [fname, '_line.fig'])
 
 end
 
@@ -322,7 +313,7 @@ nochange_colorbar(gca)
 
 saveas(gcf, [fname, '_duration.fig'])
 
-% save_as_pdf(gcf, fname)
+% save_as_pdf(gcf, [fname, '_duration'])
 
 if length(id) < 100
 
@@ -342,7 +333,7 @@ if length(id) < 100
 
     saveas(gcf, [fname, '_line.fig'])
 
-    % save_as_pdf(gcf, [fname, '_duration_line'])
+    % save_as_pdf(gcf, [fname, '_line'])
 
 end
 
