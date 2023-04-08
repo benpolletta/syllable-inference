@@ -13,7 +13,7 @@ timit_filenames = textscan(filename_fid, '%s', 'Delimiter', '\n');
 fclose(filename_fid);
 timit_filenames = timit_filenames{1};
 
-tsylb_output_file = [timit_dir, 'DOC/allphonelist_tsylb_words_out_l43897fix.txt'];
+tsylb_output_file = [timit_dir, 'DOC/allphonelist_tsylb_words_out_l43917fix.txt']; % 43897fix.txt'];
 tsylb_fid = fopen(tsylb_output_file, 'r');
 tsylb_output = textscan(tsylb_fid, '%s', 'headerLines', 1, 'Delimiter', '\n');
 fclose(tsylb_fid);
@@ -34,6 +34,10 @@ dict = dict.results;
 dict_words = {dict(:).word};
 %dict_words = cellfun(@(x) erase(x, '-'), dict_words, 'unif', 0);
 dict_sylbs = {dict(:).sylb_cell};
+
+[tsylb_phonemes, class_indicator, class_names] = getPhones(1);
+vowels = tsylb_phonemes(class_indicator(:, strcmpi(class_names, 'vowels')));
+vowels = {vowels{:}, 'el', 'em', 'en', 'enx'};
 
 pound_fid = fopen([timit_dir, 'DOC/replaced_pauses.txt'], 'w');
 ncsn_fid = fopen([timit_dir, 'DOC/non_canonical_sylb_num.txt'], 'w');
@@ -201,6 +205,7 @@ for s = 1:length(tsylb_output)
 
     %% Comparing to canonical words to fix syllabification errors.
     these_cwords = cwords{s};
+    canonical_sylbs = cell(size(word_cell));
     
     for w = 1:length(word_cell)
 
@@ -210,73 +215,156 @@ for s = 1:length(tsylb_output)
         these_dict_sylbs = dict_sylbs(dict_index);
         these_dict_phones = cellfun(@(x) strsplit(x, '/'), these_dict_sylbs{:}, 'unif', 0);
         these_dict_phones = cat(2, these_dict_phones{:});
-        these_dict_prons = cellfun(@(x) strjoin(x, '*'), these_dict_sylbs, 'unif', 0);
+        this_dict_pron = cellfun(@(x) strjoin(x, '*'), these_dict_sylbs, 'unif', 0);
+
         initial_pron = word_cell{w};
         initial_phones = cat(2, word_sylb_phone_cell{w}{:});
+        initial_sylbs = word_sylb_phone_cell{w};
+        initial_sylb_lengths = cellfun(@length, initial_sylbs);
+
         resolution = '';
 
         if length(these_dict_sylbs{:}) == length(word_sylb_cell{w})
 
-            canonical_sylbs{w} = these_dict_sylbs;
+            canonical_sylbs{w} = these_dict_sylbs{:};
 
         else
-            
+
+            resolved_flag = 0;
+
             if all(strcmp(these_dict_sylbs{:}, 'y/ih/r'))
 
                 canonical_sylbs{w} = word_sylb_cell{w};
 
-                resolution = strjoin(word_sylb_cell{w}, '*');
+            else
 
-            elseif length(these_dict_phones) == length(initial_phones)
+                if initial_sylb_lengths(end) == 1
 
-                sound_families = {{'q', 't', 'd', 'dh', 'dx'}, {'s', 'z', 'zh', 'jh'}};
-                delimiters = {'/','*'};
-                strings = {these_dict_prons{:}, word_cell{w}};
-                [patterns, locations] = deal(cell(length(delimiters), length(sound_families)));
+                    if ~any(strcmpi(vowels, initial_sylbs{end}{1}))
 
-                for d = 1:length(delimiters)
-                    patterns(d, :) = cellfun(@(y)['(', strjoin(cellfun(@(x) [delimiters{d},x], y, 'unif', 0), '|'), ')'], sound_families, 'unif', 0);
-                    locations(d, :) = cellfun(@(x) regexp(strings{d}, x), patterns(d, :), 'unif', 0);
-                end
-                
-                family = find(all(~cellfun(@isempty, locations)));
-
-                if ~isempty(family)
-
-                    fam_home = locations(:, family);
-
-                    if fam_home{1} == fam_home{2}
-
-                        word_cell{w}(fam_home{2}) = '/';
-
-                        word_sylb_cell{w} = strsplit(word_cell{w}, '*');
-                        word_sylb_phone_cell{w} = cellfun(@(x) strsplit(x, '/'), word_sylb_cell{w}, 'unif', 0);
-
-                        canonical_sylbs{w} = these_dict_sylbs;
-
-                        resolution = strjoin(word_sylb_cell{w}, '*');
+                        word_sylb_phone_cell{w}{end - 1}{end + 1} = word_sylb_phone_cell{w}{end}{1};
+                        word_sylb_phone_cell{w}(end) = [];
+                        word_sylb_cell = cellfun(@(x) cellfun(@(y) strjoin(y, '/'), x, 'unif', 0), word_sylb_phone_cell, 'unif', 0);
+                        word_cell = cellfun(@(x) strjoin(x, '*'), word_sylb_cell, 'unif', 0);
 
                     end
 
                 end
 
+                sound_families = {{'q', 't', 'd', 'dh', 'dx'}, {'s', 'z', 'zh', 'jh'},{'nx', 'g', 'k'},{'b'}};
+
+                delimiters = {'/','\*'};
+                strings = {this_dict_pron{:}, word_cell{w}};
+                [delims_first, delims_last] = deal(cell(length(delimiters), length(sound_families)));
+
+                for d = 1:length(delimiters)
+                    delims_first(d, :) = cellfun(@(y) ['(', strjoin(cellfun(@(x) [delimiters{d},x], y, 'unif', 0), '|'), ')'], sound_families, 'unif', 0);
+                    delims_last(d, :) = cellfun(@(y) ['(', strjoin(cellfun(@(x) [x, delimiters{d}], y, 'unif', 0), '|'), ')'], sound_families, 'unif', 0);
+                    patterns = cat(2, delims_first, delims_last);
+                    locations(d, :) = cellfun(@(x) regexp(strings{d}, x), patterns(d, :), 'unif', 0);
+                end
+
+                family = find(all(~cellfun(@isempty, locations)));
+
+                if ~isempty(family)
+
+                    for f = 1:length(family)
+
+                        fam_home = locations(:, f);
+
+                        [match_i, match_j] = find(cell2mat(arrayfun(@(i) fam_home{1}' == i, fam_home{2}, 'UniformOutput', false)));
+
+                        [match_i_reverse, match_j_reverse] = find(cell2mat(arrayfun(@(i) (length(strings{1}) - fam_home{1})' == i, length(strings{2}) - fam_home{2}, 'UniformOutput', false)));
+
+                        if ~isempty(match_j) % fam_home{1} == fam_home{2}
+
+                            word_cell{w}(fam_home{2}(match_j) + ceil(f/2) - 1) = '/';
+
+                            word_sylb_cell{w} = strsplit(word_cell{w}, '*');
+                            word_sylb_phone_cell{w} = cellfun(@(x) strsplit(x, '/'), word_sylb_cell{w}, 'unif', 0);
+
+                        elseif ~isempty(match_j_reverse)
+
+                            word_cell{w}(fam_home{2}(match_j_reverse) + ceil(f/2) - 1) = '/';
+
+                            word_sylb_cell{w} = strsplit(word_cell{w}, '*');
+                            word_sylb_phone_cell{w} = cellfun(@(x) strsplit(x, '/'), word_sylb_cell{w}, 'unif', 0);
+
+                        end
+
+                    end
+
+                end
+
+                word_sylb_phone_num = cellfun(@length, word_sylb_phone_cell{w});
+                single_phone_sylbs = find(word_sylb_phone_num == 1);
+
+                for sps = 1:length(single_phone_sylbs)
+
+                    this_sylb = single_phone_sylbs(sps);
+
+                    if ~any(strcmpi(vowels, word_sylb_phone_cell{w}{this_sylb}{1}))
+                        
+                        if this_sylb == 1
+                            index = 2;
+                        elseif this_sylb == length(word_sylb_phone_cell{w}{this_sylb})
+                            index = 1;
+                        else
+                            prompt = sprintf('Sentence %d \n Canonical pronunciation: %s \n This pronunciation: %s \n Syllable %d should join: \n 1) %s \n 2) %s \n 3) neither \n',...
+                                s, this_dict_pron{:}, word_cell{w}, this_sylb, word_sylb_cell{w}{this_sylb - 1}, word_sylb_cell{w}{this_sylb + 1});
+                            index = input(prompt);
+                        end
+
+                        if index == 1
+
+                            word_sylb_phone_cell{w}{this_sylb - 1}{end + 1} = word_sylb_phone_cell{w}{this_sylb}{1};
+                            word_sylb_phone_cell{w}(this_sylb) = [];
+
+                        elseif index == 2
+
+                            word_sylb_phone_cell{w}{this_sylb + 1}(2:end + 1) = word_sylb_phone_cell{w}{this_sylb + 1};
+                            word_sylb_phone_cell{w}{this_sylb + 1}{1} = word_sylb_phone_cell{w}{this_sylb}{1};
+                            word_sylb_phone_cell{w}(this_sylb) = [];
+
+                        end
+
+                        word_sylb_cell = cellfun(@(x) cellfun(@(y) strjoin(y, '/'), x, 'unif', 0), word_sylb_phone_cell, 'unif', 0);
+                        word_cell = cellfun(@(x) strjoin(x, '*'), word_sylb_cell, 'unif', 0);
+
+                        single_phone_sylbs = single_phone_sylbs - 1;
+
+                    end
+
+                end
+
+                if length(these_dict_sylbs{:}) == length(word_sylb_cell{w})
+
+                    canonical_sylbs{w} = these_dict_sylbs{:};
+                    resolved_flag = 1;
+
+                else
+                    
+                    canonical_sylbs{w} = word_sylb_cell{w};
+
+                end
+
             end
 
-            if ~isempty(resolution)
+            resolution = strjoin(word_sylb_cell{w}, '*');
 
-                fprintf(rncsn_fid, '%s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution);
+            if ~resolved_flag
+
+                fprintf(ncsn_fid, '%s %s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution, strjoin(canonical_sylbs{w}, '*'));
 
             else
 
-                fprintf(ncsn_fid, '%s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron);
+                fprintf(rncsn_fid, '%s %s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution, strjoin(canonical_sylbs{w}, '*'));
 
             end
 
         end
 
-
     end
-
 
     %% Recounting syllables per word.
     word_sylb_num = cellfun(@length, word_sylb_cell);
@@ -328,7 +416,7 @@ for s = 1:length(tsylb_output)
     %% Saving results.
     results(s) = struct('word_cell', {word_cell}, 'word_sylb_cell', {word_sylb_cell}, 'word_sylb_phone_cell', {word_sylb_phone_cell},...
         'word_sylb_phone_num', {word_sylb_phone_num}, 'word_phone_num', word_phone_num, 'word_sylb_num', word_sylb_num,...
-        'sylb_phone_cell', {sylb_phone_cell}, 'sylb_cell', {sylb_cell}, 'phone_cell', {phone_cell});
+        'canonical_sylbs', {canonical_sylbs}, 'sylb_phone_cell', {sylb_phone_cell}, 'sylb_cell', {sylb_cell}, 'phone_cell', {phone_cell});
     
 end
 
