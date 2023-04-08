@@ -1,4 +1,4 @@
-function [timit_phonemes, class_indicator, class_names] = getTIMITphonesNew(tsylb_option)
+function [timit_phonemes, class_indicator, class_names] = getTIMITphones(tsylb_option)
 
 if nargin == 0, tsylb_option = []; end
 if isempty(tsylb_option), tsylb_option = 0; end
@@ -39,6 +39,17 @@ timit_phonemes = cellfun(@(x) x{:}, timit_phonemes, 'unif', 0);
 
 if tsylb_option
 
+    % Closure labels suppression:
+    stops = {'b', 'd', 'g', 'p', 't', 'k'};
+
+    for s = 1:length(stops)
+
+        indcl=strmatch([stops{s}, 'cl'], timit_phonemes);
+        timit_phonemes(indcl) = [];
+        class_indicator(indcl, :) = [];
+
+    end
+
     % Replace /pau/ by #:
     indpau=strmatch('pau', timit_phonemes);
     timit_phonemes(indpau)=cellstr('#');
@@ -55,42 +66,38 @@ if tsylb_option
     indeng=strmatch('eng', timit_phonemes);
     timit_phonemes(indeng)=cellstr('enx');
 
-    % Replace /ng/ by /nx/
+    % Replace /ng/ by /nx/, which already exists in th elist of phonemes.
     indng=strmatch('ng', timit_phonemes);
-%     timit_phonemes(indng)=[];
-%     class_indicator(indng, :) = [];
-    timit_phonemes(indng)=cellstr('nx');
+    timit_phonemes(indng)=[];
+    class_indicator(indng, :) = [];
+    % timit_phonemes(indng)=cellstr('nx');
 
-%     % Suppress /epi/:
-%     indepi=strmatch('epi', timit_phonemes);
-%     timit_phonemes(indepi)=[];
-%     class_indicator(indepi, :) = [];
-    
-    % Replace /epi/ by #:
+    % Suppress /epi/:
     indepi=strmatch('epi', timit_phonemes);
-    timit_phonemes(indepi)=cellstr('#');
+    timit_phonemes(indepi)=[];
+    class_indicator(indepi, :) = [];
+    
+    %     % Replace /epi/ by #:
+    %     indepi=strmatch('epi', timit_phonemes);
+    %     timit_phonemes(indepi)=cellstr('#');
 
-    % Replace /ax-h/ by /ah/
+    % Replace /ax-h/ by /ah/, which already exists in the list of phonemes.
     indaxh=strmatch('ax-h', timit_phonemes);
-%     timit_phonemes(indaxh)=[];
-%     class_indicator(indaxh, :) = [];
-    timit_phonemes(indaxh)=cellstr('ah');
+    timit_phonemes(indaxh)=[];
+    class_indicator(indaxh, :) = [];
 
-    % Replace /hv/ by /hh/
+    % Replace /hv/ by /hh/, which already exists in the list of phonemes.
     indhv=strmatch('hv', timit_phonemes);
-%     timit_phonemes(indhv)=[];
-%     class_indicator(indhv, :) = [];
-    timit_phonemes(indhv)=cellstr('hh');
+    timit_phonemes(indhv)=[];
+    class_indicator(indhv, :) = [];
 
-    % Add /wh/
-    indw = strmatch('w', timit_phonemes);
-    timit_phonemes((indw + 2):(end + 1)) = timit_phonemes((indw + 1):end);
-    class_indicator((indw + 2):(end + 1), :) = class_indicator((indw + 1):end, :);
-    timit_phonemes(indw + 1)=cellstr('wh');
-    class_indicator(indw + 1, :) = class_indicator(indw, :);
+    %     % Add /wh/
+    %     indw = strmatch('w', timit_phonemes);
+    %     timit_phonemes((indw + 2):(end + 1)) = timit_phonemes((indw + 1):end);
+    %     class_indicator((indw + 2):(end + 1), :) = class_indicator((indw + 1):end, :);
+    %     timit_phonemes(indw + 1)=cellstr('wh');
+    %     class_indicator(indw + 1, :) = class_indicator(indw, :);
     
 end
-
-timit_phonemes = timit_phonemes;
 
 save('TIMITphones.mat', 'timit_phonemes', 'class_names', 'class_indicator')

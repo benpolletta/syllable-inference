@@ -24,9 +24,6 @@ file_list = textscan(filename_fid, '%s', 'Delimiter', '\n');
 fclose(filename_fid);
 file_list = file_list{1};
 
-wsp_map = load('word2sylb2phone_bysentence.mat');
-wsp_map = wsp_map.results;
-
 dict = load('word2sylb2phone_DICT.mat');
 dict = dict.results;
 dict_words = {dict(:).word};
@@ -83,7 +80,8 @@ for s = 1:length(SI)
 
                     ambiguous_sentences(end + 1) = {sentence};
 
-                    prompt = sprintf('No unique match for %s in sentence\n ''%s'' \n is found in TIMITDIC. Possible matches are:\n %s.\n Please enter the index of the correct word:\n',words{w}, strjoin(words, ' '), strjoin(possible_words, ', '));
+                    prompt = sprintf('No unique match for %s in sentence\n ''%s'' \n is found in TIMITDIC. The %d possible matches are:\n %s.\n Please enter the index of the correct word:\n',...
+                        words{w}, strjoin(words, ' '), length(possible_words), strjoin(possible_words, ', '));
 
                     index = input(prompt);
 

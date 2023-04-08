@@ -8,7 +8,7 @@ cdf = phone_data.cdf;
 
 trans_data = load('phoneTransitions.mat');
 trans_prob = trans_data.prob;
-trans_phone_id = trans_data.timit_phonemes;
+trans_phone_id = trans_data.phonemes;
 
 prob_phones = ones(size(phone_sequence));
 

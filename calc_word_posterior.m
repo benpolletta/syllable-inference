@@ -1,13 +1,16 @@
-function posterior = calc_phone_posterior_new(likelihood, method, tsylb_option)
+function posterior = calc_word_posterior(word_seq, landmark)
+% word_seq = (cell) sequence of words used to construct template to compare
+%               to time series of observed (prior) distributions over phonemes 
+%               (i.e., observed phoneme sequence).
+% landmark = (struct w/ fields phase, measure) indicates current temporal
+%               landmark used to align word sequence template w/ observed
+%               phoneme sequence.
 
 if nargin < 2, method = ''; end
-if nargin < 3, tsylb_option = []; end
-if isempty(method), method = 'phone-specific'; end
-if isempty(tsylb_option), tsylb_option = 1; end
 
 global stats
 
-stats = loadStats(tsylb_option);
+stats = loadStats;
 
 fields = fieldnames(likelihood);
 
@@ -27,15 +30,13 @@ trans2timit = cellfun(@(x) strcmpi(x, phones), stats.trans_phones, 'unif', 0);
 trans2timit_mat = cat(2, trans2timit{:});
 trans_prob = nanunitsum(trans2timit_mat*stats.trans_prob*trans2timit_mat');
 
-[haz_est, haz_ent, transition, trans_posterior, inv_entropy] = deal(zeros(size(trans_likelihood)));
+[hazard, transition, trans_posterior, inv_entropy] = deal(zeros(size(trans_likelihood)));
 phone_posterior = nan(size(phone_likelihood));
-hazard = nan(size(phones2timit_mat, 2), size(phone_likelihood, 2));
 
 phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.prob);
 trans_posterior(1) = eps;
 
 trans_lookback = 10; % In timesteps.
-% decay_time = 1000; % In timesteps.
 
 last_transition = 0;
 [last_transition_index, last_posterior_index] = deal(1);
@@ -56,45 +57,27 @@ for w = 2:length(time)
 
     end
 
-%     unif_phone_dist = nanunitsum(ones(size(phone_prior)));
-%     phone_prior = phone_prior + (unif_phone_dist - phone_prior)/decay_time;
-
     switch method
 
-        case 'phone-specific'
+        case ''
 
-            this_dist = nanunitsum((phones2timit_mat')*phone_prior);
-            hazard(:, w) = phone_hazard(duration);
-            haz_est(w) = sum(hazard(:, w).*this_dist);
-            % haz_var(w) = sum((hazard(:, w).^2).*this_dist) - haz_est(w)^2;
-            haz_ent(w) = -nansum(nanunitsum(hazard(:, w)).*log(nanunitsum(hazard(:, w))))/log(num_phones); % (log(num_phones) + nansum(hazard(:, w).*log(hazard(:, w))))/num_phones;
-
-        case 'non-phone-specific'
-
-            this_dist = (phones2timit_mat')*phone_prior;
-            haz_est(w) = sum(phone_hazard(duration).*nanunitsum(this_dist));
-            haz_ent(w) = 0;
-            hazard(:, w) = haz_est(w)*ones(size(this_dist));
+            hazard(w) = phone_hazard((phones2timit_mat')*phone_prior, duration);
 
 
         case 'exponential'
 
-            haz_est(w) = 1 - exp(-time_since_last_prior/mean(diff(time)));
-            haz_ent(w) = 0;
-            hazard(:, w) = haz_est(w)*ones(size(phone_prior));
+            hazard(w) = 1 - exp(-time_since_last_prior/mean(diff(time)));
 
         case 'zero_hazard'
 
-            haz_est(w) = 0;
-            haz_ent(w) = 0;
-            hazard(w) = zeros(size(phone_prior));
+            hazard(w) = 0;
 
     end
     
-    phone_posterior(:, w) = nanunitsum(phone_likelihood(:, w).*(phone_prior.*(1 - phones2timit_mat*hazard(:, w)) + trans_prob*phone_prior.*phones2timit_mat*hazard(:, w)));
+    phone_posterior(:, w) = nanunitsum(phone_likelihood(:, w).*(phone_prior*(1 - hazard(w)) + trans_prob*phone_prior*hazard(w)));
 
     % tp_derivative(w) = trans_likelihood(w)*
-    trans_posterior(w) = trans_likelihood(w) + haz_ent(w)*haz_est(w); %*hazard(w); % trans_posterior(w - 1)*hazard(w);
+    trans_posterior(w) = trans_likelihood(w); %*hazard(w); % trans_posterior(w - 1)*hazard(w);
 
     inv_entropy(w) = (log(num_phones) + nansum(phone_posterior(:, w).*log(phone_posterior(:, w))))/num_phones;
 
@@ -121,19 +104,18 @@ for w = 2:length(time)
 end
 
 posterior = struct('likelihood', likelihood, 'phone_posterior', phone_posterior, 'trans_posterior', trans_posterior,...
-    'hazard', hazard, 'hazard_est', haz_est, 'hazard_var', haz_ent, 'transition', transition, 'pt_dist', pt_dist, 'inv_entropy', inv_entropy);
+    'hazard', hazard, 'transition', transition, 'pt_dist', pt_dist, 'inv_entropy', inv_entropy);
 
 end
 
-function hazard = phone_hazard(duration) % (dist, duration)
+function hazard = phone_hazard(dist, duration)
 
 global stats
 
 [~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.cdf, 'unif', 0);
-hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index); 
-% duration_hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index);
+duration_hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index);
 
-% hazard = sum(duration_hazard.*nanunitsum(dist));
+hazard = sum(duration_hazard.*nanunitsum(dist));
 
 end
 
@@ -141,7 +123,7 @@ function intensity = phone_intensity(dist, duration)
 
 global stats
 
-pdf = cellfun(@(x) [cumsum(x(:, 1) + diff([x(:, 1); x(end, 1)])/2), diff]);
+pdf = cellfun(@(x) [cumsum(x(:, 1) + diff([x(:, 1); x(end, 1)])/2), stats.cdf, 'unif', 0);
 
 [~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.cdf, 'unif', 0);
 duration_hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index);

@@ -8,6 +8,7 @@ dict_lines = dict_lines{1};
 
 pron_file = [timit_dir, 'DOC/TIMITDIC_pronunciations.txt'];
 pron_fid = fopen(pron_file, 'w');
+fprintf(pron_fid, '%s\n', '');
 
 for w = 1:length(dict_lines)
 
