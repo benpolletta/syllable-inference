@@ -101,19 +101,13 @@ syllabic_rate = [results(:).syllabic_rate];
 syllable_count = cellfun(@length, {results(:).sylbs});
 all_durations = cat(1, results.sylb_durations);
 
-id = 'Syllable Duration';
+index = ones(size(all_durations));
+id = {'Syllable Duration'};
+fname = ['sylbDuration', name, '_prob'];
 
-[hist, bins] = histcounts(all_durations, 'Normalization', 'probability', 'BinMethod', 'sqrt');
+[count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(all_durations, index, id, ceil(sqrt(length(SI))), fname);
 
-bin_centers = bins(:, 1:(end - 1)) + diff(bins, [], 2)/2;
-bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
-    bin_centers, bin_centers(:, end) + mean(diff(bins, [], 2), 2)];
-
-hist = [zeros(size(hist(:, 1))), hist, zeros(size(hist(:, end)))];
-
-fname = ['sylDuration', name, '_prob'];
-        
-plotIndividualizedHistograms(fname, {id}, {bin_centers'}, {hist'})
+plotIndividualizedHistograms(fname, id, bin_centers_cell', hist_cell')
 
 %% Collecting syllable lengths across sentences.
 
@@ -143,7 +137,7 @@ syl_grouping_vars = {all_sylbs, canonical_sylbs, phoneno_vec, firstphone_vec};
 
 syl_grouping_labels = {'', 'Canon', 'PhoneNum', 'FirstPhone'};
 
-vec_labels = {'syl', 'normSyl'};
+vec_labels = {'sylb', 'normSylb'};
 
 sort_option = [1 1 0 0];
 
@@ -223,15 +217,17 @@ function plotProbability(prob, ids, sort_option)
 if sort_option
     [prob, sort_order] = sort(prob, 'descend');
     ids = ids(sort_order);
-end
 
-x_tick_step = round(length(ids)/10);
-these_x_ticks = 1:x_tick_step:length(ids);
+    these_x_ticks = int32(logspace(0, log10(length(ids)), 20));
+else
+    x_tick_step = round(length(ids)/20);
+    these_x_ticks = 1:x_tick_step:length(ids);
+end
 
 figure()
 
 if sort_option
-    semilogy(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+    loglog(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
 else
     plot(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
 end

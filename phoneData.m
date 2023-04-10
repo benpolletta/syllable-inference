@@ -51,7 +51,7 @@ for s = 1:length(SI)
     phone_indices = cellfun(@str2num, phone_data(1:2, :));
     phone_times = ((phone_indices/16 + onset_time)/1000)';
     
-    phone_lengths = diff(phone_times, [], 2); 
+    phone_durations = diff(phone_times, [], 2); 
     
     %% Retrieving syllable boundary_times & normalizing phone lengths.
     
@@ -61,22 +61,35 @@ for s = 1:length(SI)
     fclose(fid);
     tsylb_indices = tsylb_indices{1};
     syllable_times = (tsylb_indices/16 + onset_time)/1000;
-    syllable_lengths = diff(syllable_times);
+    syllable_durations = diff(syllable_times);
     
-    norm_phone_lengths = phone_lengths/mean(syllable_lengths);
+    norm_phone_durations = phone_durations/mean(syllable_durations);
     
     %% Saving results.
     
-    results(s) = struct('phone_lengths', phone_lengths, 'phones', {phones},...
-        'syllable_lengths', syllable_lengths, 'norm_phone_lengths', norm_phone_lengths);
+    results(s) = struct('phone_durations', phone_durations, 'phones', {phones},...
+        'syllable_durations', syllable_durations, 'norm_phone_durations', norm_phone_durations);
     
 end
 
-phone_length_vec = cat(1, results.phone_lengths);
+length_vec = cat(1, results.phone_durations);
 
-norm_phone_length_vec = cat(1, results.norm_phone_lengths);
+norm_length_vec = cat(1, results.norm_phone_durations);
 
 phone_vec = cat(2, results.phones)';
+
+no_bins = ceil(sqrt(length(SI)));
+
+%% Plotting overall phoneme duration distribution.
+
+index = ones(size(length_vec));
+id = {'Phoneme Duration'};
+fname = ['phoneDuration', name, '_prob'];
+
+[count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(length_vec, index, id, no_bins, fname);
+
+
+plotIndividualizedHistograms(fname, id, bin_centers_cell', hist_cell')
 
 %% Getting list of phonemes used in TIMIT.
 
@@ -116,9 +129,7 @@ phone_index = present_map(group_index);
 
 class_index = class_map(present_map(group_index));
 
-no_bins = ceil(sqrt(length(SI)));
-
-vecs = {phone_length_vec, norm_phone_length_vec};
+vecs = {length_vec, norm_length_vec};
 indices = {phone_index, class_index};
 ids = {present_phonemes, class_names};
 if tsylb_flag
@@ -128,20 +139,15 @@ else
 end
 index_labels = {'', 'Class'};
 no_skipped = [3 1];
+sort_option = [1 1];
 
 for v = 1:length(vecs)
     for i = 1:length(indices)
         
         fname = [vec_labels{v}, index_labels{i}, name];
-        [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vecs{v}, indices{i}, ids{i}, no_bins, fname);
+        [count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(vecs{v}, indices{i}, ids{i}, no_bins, fname);
         
-        figure()
-        plot(1:length(ids{i}), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
-        set(gca, 'XTick', 1:length(ids{i}), 'XTickLabel', ids{i})
-        xtickangle(45)
-        axis tight
-        title('Phoneme Distribution')
-        ylabel('Probability')
+        plotProbability(prob, ids{i}, sort_option(i))
         
         saveas(gcf, [fname, '.fig'])
         
@@ -152,14 +158,14 @@ end
 
 end
 
-function [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vec, index, id, no_bins, fname)
+function [count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(vec, index, id, no_bins, fname)
 
 count = splitapply(@(x) length(x), vec, index);
 prob = count/sum(count);
 stats = splitapply(@(x) [mean(x), std(x), quantile(x, [.5, .25, .75])], vec, index);
-cdf = splitapply(@(x){[sort(x), linspace(0, 1, length(x))']}, vec, index);
+cdf = splitapply(@(x) {[sort(x), linspace(0, 1, length(x))']}, vec, index);
 
-[hist, bins] = splitapply(@(x) histcounts(x, no_bins, 'Normalization', 'probability'), vec, index);
+[hist, bins] = splitapply(@(x) histcounts(x, no_bins, 'Normalization', 'probability'), vec, index); % no_bins, 'Normalization', 'probability'), vec, index);
 
 bin_centers = bins(:, 1:(end - 1)) + diff(bins, [], 2)/2;
 bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
@@ -167,7 +173,66 @@ bin_centers = [bin_centers(:, 1) - mean(diff(bins, [], 2), 2),...
 
 hist = [zeros(size(hist(:, 1))), hist, zeros(size(hist(:, end)))];
 
-save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bin_centers')
+[hist_cell, bins_cell] = arrayfun(@(i) histcounts(vec(index == i), 'Normalization', 'probability', 'BinMethod', 'sqrt'), min(index):max(index), 'UniformOutput', false);
+
+bin_centers_cell = cellfun(@(x) x(:, 1:(end - 1)) + diff(x, [], 2)/2, bins_cell, 'unif', 0);
+bin_centers_cell = cellfun(@(x,y) [x(:, 1) - mean(diff(y, [], 2), 2), x, x(:, end) + mean(diff(y, [], 2), 2)], bin_centers_cell, bins_cell, 'unif', 0);
+
+hist_cell = cellfun(@(x) [zeros(size(x(:, 1))), x, zeros(size(x(:, end)))], hist_cell, 'unif', 0);
+
+save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bin_centers', 'hist_cell', 'bins_cell', 'bin_centers_cell')
+
+end
+
+function plotProbability(prob, ids, sort_option)
+
+if sort_option
+    [prob, sort_order] = sort(prob, 'descend');
+    ids = ids(sort_order);
+end
+
+if length(ids) > 27
+    x_tick_step = round(length(ids)/27);
+    these_x_ticks = 3:x_tick_step:length(ids);
+    x_tick_labels = ids(these_x_ticks);
+else
+    x_ticks = 1:length(ids)
+    x_tick_labels = ids;
+end
+
+figure()
+
+plot(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+set(gca, 'XTick', these_x_ticks, 'XTickLabel', x_tick_labels)
+xtickangle(45)
+axis tight
+title('Phoneme Distribution')
+ylabel('Probability')
+
+end
+
+function plotIndividualizedHistograms(fname, id, bin_centers, hist)
+
+figure
+hold on
+
+colors = flipud(hsv(length(id)));
+
+set(gca, 'NextPlot', 'add', 'ColorOrder', colors)
+
+for i = 1:length(id)
+
+    plot(bin_centers{i}, hist{i}, 'LineWidth', 2)
+
+end
+
+legend(id)
+
+axis tight
+
+title('Phoneme Duration Distribution')
+
+saveas(gcf, [fname, '_line.fig'])
 
 end
 

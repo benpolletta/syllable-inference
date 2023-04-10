@@ -106,6 +106,18 @@ word_vec = cat(1, results.words);
 
 pron_vec = cat(2, wsp_map.word_cell)';
 
+no_bins = ceil(sqrt(length(SI)));
+
+%% Plotting word duration distribution.
+
+index = ones(size(word_length_vec));
+id = {'Word Duration'};
+fname = ['wordDuration', name, '_prob'];
+
+[count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(word_length_vec, index, id, no_bins, fname);
+
+plotIndividualizedHistograms(fname, id, bin_centers_cell', hist_cell')
+
 %% Collecting word lengths across sentences.
 
 %%% Calculating grouping variables.
@@ -131,9 +143,15 @@ pron_map = splitapply(@(x) {x}, pron_vec, word_index);
 [pronunciation_index, unique_pronunciations] = cellfun(@findgroups, pron_map, 'unif', 0);
 num_pronunciations = cellfun(@length, unique_pronunciations);
 
-%%% Computing_stats.
+index = ones(size(num_pronunciations));
+id = {'Number of Pronunciations'};
+fname = ['numPronunciations', name, '_prob'];
 
-no_bins = ceil(sqrt(length(SI)));
+[count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(num_pronunciations, index, id, no_bins, fname);
+
+plotIndividualizedHistograms(fname, id, bin_centers_cell', hist_cell')
+
+%%% Computing_stats.
 
 vecs = {word_length_vec, norm_word_length_vec};
 indices = {word_index, word_sylb_num_vec + 1, word_phone_num_vec};
@@ -157,7 +175,9 @@ for v = 1:length(vecs)
 
         % save_as_pdf(gcf, [fname, '_prob'])
         
-        plotHistograms(fname, ids{i}(1:(end - no_skipped(i))), bin_centers(1:(end - no_skipped(i)), :)', hist(1:(end - no_skipped(i)), :)')
+        plotHistograms(fname, ids{i}, bin_centers', hist')
+
+        plotIndividualizedHistograms(fname, ids{i}, bin_centers_cell, hist_cell)
         
     end
 end
@@ -183,7 +203,7 @@ lengths = diff(times, [], 2);
 
 end
 
-function [count, prob, stats, cdf, hist, bins, bin_centers] = calcStats(vec, index, id, no_bins, fname)
+function [count, prob, stats, cdf, hist, bins, bin_centers, hist_cell, bins_cell, bin_centers_cell] = calcStats(vec, index, id, no_bins, fname)
 
 count = splitapply(@(x) length(x), vec, index);
 prob = count/sum(count);
@@ -214,19 +234,22 @@ function plotProbability(prob, ids, sort_option)
 if sort_option
     [prob, sort_order] = sort(prob, 'descend');
     ids = ids(sort_order);
-end
 
-x_tick_step = round(length(ids)/10);
-these_x_ticks = 1:x_tick_step:length(ids);
+    these_x_ticks = int32(logspace(0, log10(length(ids)), 20));
+else
+    x_tick_step = round(length(ids)/20);
+    these_x_ticks = 1:x_tick_step:length(ids);
+end
+x_tick_labels = ids(these_x_ticks);
 
 figure()
 
 if sort_option
-    semilogy(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
+    loglog(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
 else
     plot(1:length(ids), prob/sum(prob), 'LineWidth', 2, 'Color', 'k')
 end
-set(gca, 'XTick', these_x_ticks, 'XTickLabel', ids(these_x_ticks))
+set(gca, 'XTick', these_x_ticks, 'XTickLabel', x_tick_labels)
 xtickangle(45)
 axis tight
 title('Word Distribution')
