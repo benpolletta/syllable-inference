@@ -11,7 +11,7 @@ end
 
 %% Getting phoneme probabilities.
 phone_data = load([phone_prefix, 'Data.mat']);
-stats = phone_data;
+stats.phones = phone_data;
 
 %% Getting phone to feature mapping.
 phone2feature_data = load([phone_prefix, 's2features.mat']);
@@ -45,9 +45,16 @@ trans_count(zero_trans_mat) = 0;
 all_transitions = zscore(cell2mat(trans_vector_column)); % zscore(diag(t_count(:))*trans_vector_column);
 sigma_t = 2*cov(all_transitions, 'partialrows')/3; % (all_transitions'*all_transitions)/(num_trans - 1);
 
-stats.trans_phones = transition_data.phonemes;
-stats.trans_prob = trans_prob;
-stats.trans_count = trans_count;
-stats.sigma_t = sigma_t;
+stats.phone_trans.phones = transition_data.phonemes;
+stats.phone_trans.prob = trans_prob;
+stats.phone_trans.count = trans_count;
+stats.phone_trans.sigma = sigma_t;
 
+%% Getting syllable probabilities.
+
+sylb_data = load('normSylbData.mat');
+sylb_fields = fieldnames(sylb_data);
+
+for f = 1:length(sylb_fields)
+    eval(sprintf('stats.sylbs.%s = sylb_data.%s;', sylb_fields{f}, sylb_fields{f}));
 end
