@@ -20,11 +20,11 @@ plot(gca, vowel_lh.time, scaled_vl, 'w', 'LineWidth', 0.5)
 
 D2_vowel_lh = diff(diff(vowel_lh.vowel_likelihood));
 scaled_dvl = (D2_vowel_lh - min(D2_vowel_lh))*(length(vowel_lh.feature_names)/range(D2_vowel_lh));
-plot(gca, vowel_lh.indicator_time, scaled_dvl, 'w--', 'LineWidth', 0.5)
+plot(gca, vowel_lh.time(2:end - 1), scaled_dvl, 'w--', 'LineWidth', 0.5)
 
 vowel_ind = vowel_lh.v_indicator;
 scaled_vi = (vowel_ind - min(vowel_ind))*(length(vowel_lh.feature_names)/range(vowel_ind));
-plot(gca, vowel_lh.indicator_time, scaled_vi, 'y', 'LineWidth', 0.5)
+plot(gca, vowel_lh.time, scaled_vi, 'y', 'LineWidth', 0.5)
 
 window_length = 500; % 2501;
 
