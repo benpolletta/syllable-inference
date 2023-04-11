@@ -74,6 +74,7 @@ else
         fid = fopen(pron_filename, 'w');
 
         these_pronunciations = wsp_map(file_index).word_cell;
+        canonical_words = wsp_map(file_index).canonical_word_cell;
 
         for_print = mat2cell(word_times, ones(size(word_times, 1), 1), [1 1]);
         for_print(:, end + 1) = these_pronunciations(:);
@@ -104,6 +105,8 @@ word_phone_num_vec = cat(2, wsp_map.word_phone_num)';
 
 word_vec = cat(1, results.words);
 
+cword_vec = cat(1, results.canonical_words);
+
 pron_vec = cat(2, wsp_map.word_cell)';
 
 no_bins = ceil(sqrt(length(SI)));
@@ -125,6 +128,7 @@ plotIndividualizedHistograms(fname, id, bin_centers_cell', hist_cell')
 % Grouping by words.
 
 [word_index, word_id] = findgroups(word_vec);
+[canonical_word_index, canonical_word_id] = findgroups(cword_vec);
 
 % Grouping by length in syllables.
 
@@ -154,12 +158,11 @@ plotIndividualizedHistograms(fname, id, bin_centers_cell', hist_cell')
 %%% Computing_stats.
 
 vecs = {word_length_vec, norm_word_length_vec};
-indices = {word_index, word_sylb_num_vec + 1, word_phone_num_vec};
-ids = {word_id, sylb_num_id, phone_num_id};
-sort_option = {1, 0, 0};
+indices = {word_index, canonical_word_index, word_sylb_num_vec + 1, word_phone_num_vec};
+ids = {word_id, canonical_word_id, sylb_num_id, phone_num_id};
+sort_option = {1, 1, 0, 0};
 vec_labels = {'word', 'normWord'};
-index_labels = {'', 'NumSylbs', 'NumPhones'};
-no_skipped = [0 0 0];
+index_labels = {'', 'Canon', 'NumSylbs', 'NumPhones'};
 
 for v = 1:length(vecs)
     for i = 1:length(indices)

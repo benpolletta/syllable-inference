@@ -204,14 +204,14 @@ for s = 1:length(tsylb_output)
     word_cell = cellfun(@(x) strjoin(x, '*'), word_sylb_cell, 'unif', 0);
 
     %% Comparing to canonical words to fix syllabification errors.
-    these_cwords = cwords{s};
-    canonical_sylbs = cell(size(word_cell));
+    canonical_word_cell = cat(1, cwords{s}{:});
+    canonical_sylb_cell = cell(size(word_cell));
     
     for w = 1:length(word_cell)
 
         % Finding canonical pronunciations.
 
-        dict_index = find(strcmp(these_cwords{w}, dict_words));
+        dict_index = find(strcmp(canonical_word_cell{w}, dict_words));
         these_dict_sylbs = dict_sylbs(dict_index);
         these_dict_phones = cellfun(@(x) strsplit(x, '/'), these_dict_sylbs{:}, 'unif', 0);
         these_dict_phones = cat(2, these_dict_phones{:});
@@ -226,7 +226,7 @@ for s = 1:length(tsylb_output)
 
         if length(these_dict_sylbs{:}) == length(word_sylb_cell{w})
 
-            canonical_sylbs{w} = these_dict_sylbs{:};
+            canonical_sylb_cell{w} = these_dict_sylbs{:};
 
         else
 
@@ -234,7 +234,7 @@ for s = 1:length(tsylb_output)
 
             if all(strcmp(these_dict_sylbs{:}, 'y/ih/r'))
 
-                canonical_sylbs{w} = word_sylb_cell{w};
+                canonical_sylb_cell{w} = word_sylb_cell{w};
 
             else
 
@@ -339,12 +339,12 @@ for s = 1:length(tsylb_output)
 
                 if length(these_dict_sylbs{:}) == length(word_sylb_cell{w})
 
-                    canonical_sylbs{w} = these_dict_sylbs{:};
+                    canonical_sylb_cell{w} = these_dict_sylbs{:};
                     resolved_flag = 1;
 
                 else
                     
-                    canonical_sylbs{w} = word_sylb_cell{w};
+                    canonical_sylb_cell{w} = word_sylb_cell{w};
 
                 end
 
@@ -354,11 +354,11 @@ for s = 1:length(tsylb_output)
 
             if ~resolved_flag
 
-                fprintf(ncsn_fid, '%s %s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution, strjoin(canonical_sylbs{w}, '*'));
+                fprintf(ncsn_fid, '%s %s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution, strjoin(canonical_sylb_cell{w}, '*'));
 
             else
 
-                fprintf(rncsn_fid, '%s %s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution, strjoin(canonical_sylbs{w}, '*'));
+                fprintf(rncsn_fid, '%s %s %s %s %s\n', file_name, strjoin(these_dict_sylbs{:}, '*'), initial_pron, resolution, strjoin(canonical_sylb_cell{w}, '*'));
 
             end
 
@@ -416,7 +416,8 @@ for s = 1:length(tsylb_output)
     %% Saving results.
     results(s) = struct('word_cell', {word_cell}, 'word_sylb_cell', {word_sylb_cell}, 'word_sylb_phone_cell', {word_sylb_phone_cell},...
         'word_sylb_phone_num', {word_sylb_phone_num}, 'word_phone_num', word_phone_num, 'word_sylb_num', word_sylb_num,...
-        'canonical_sylbs', {canonical_sylbs}, 'sylb_phone_cell', {sylb_phone_cell}, 'sylb_cell', {sylb_cell}, 'phone_cell', {phone_cell});
+        'canonical_word_cell', {canonical_word_cell}, 'canonical_sylb_cell', {canonical_sylb_cell},...
+        'sylb_phone_cell', {sylb_phone_cell}, 'sylb_cell', {sylb_cell}, 'phone_cell', {phone_cell});
     
 end
 
