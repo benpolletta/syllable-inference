@@ -196,7 +196,7 @@ if length(ids) > 27
     these_x_ticks = 3:x_tick_step:length(ids);
     x_tick_labels = ids(these_x_ticks);
 else
-    x_ticks = 1:length(ids)
+    these_x_ticks = 1:length(ids);
     x_tick_labels = ids;
 end
 

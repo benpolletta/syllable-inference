@@ -40,9 +40,7 @@ for s = 1:length(SI)
 
     syllables = wsp_map(s).sylb_cell;
     
-    %% Retrieving syllables and their start and end times.
-    
-    % transitions = cellfun(@(x, y) sprintf('%s2%s', x, y), phones(1:(end - 1)), phones(2:end), 'unif', 0);
+    %% Computing transition counts.
     
     for syl = 1:(length(syllables) - 1)
         
@@ -69,22 +67,23 @@ save([name, '.mat'], 'sylb_list', 't_count', 'prob', 'prob_rows', 'prob_cols')
 
 plotTransitions([name, '_Counts'], 'Syllable Transition Counts', sylb_list, t_count)
 
-plotTransitions([name, '_Prob'], 'Syllable Transition Probabilities (col.)', sylb_list, nanunitsum(t_count))
+plotTransitions([name, '_Prob'], 'Syllable Transition Probabilities (col.)', sylb_list, nanunitsum(t_count), 'log')
 
 end
 
-function plotTransitions(name, this_title, units, transitions, scaling, sort_option)
+function plotTransitions(name, this_title, units, transitions, scaling)
+if nargin < 5, scaling = ''; end
 
-if sort_option
-    [prob, sort_order] = sort(prob, 'descend');
-    ids = ids(sort_order);
-
-    these_x_ticks = int32(logspace(0, log10(length(ids)), 20));
-else
-    x_tick_step = round(length(ids)/20);
-    these_x_ticks = 1:x_tick_step:length(ids);
-end
-x_tick_labels = ids(these_x_ticks);
+% if sort_option
+%     [prob, sort_order] = sort(prob, 'descend');
+%     ids = ids(sort_order);
+% 
+%     these_x_ticks = int32(logspace(0, log10(length(ids)), 20));
+% else
+%     x_tick_step = round(length(ids)/20);
+%     these_x_ticks = 1:x_tick_step:length(ids);
+% end
+% x_tick_labels = ids(these_x_ticks);
 
 %% Plotting histograms.
 
