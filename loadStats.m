@@ -50,11 +50,17 @@ stats.phone_trans.prob = trans_prob;
 stats.phone_trans.count = trans_count;
 stats.phone_trans.sigma = sigma_t;
 
-%% Getting syllable probabilities.
+%% Loading syllable & word data.
 
-sylb_data = load('normSylbData.mat');
-sylb_fields = fieldnames(sylb_data);
+datafiles = {'normSylbData.mat', 'sylbTransitions.mat', 'normWordCanonData.mat', 'wordTransitions.mat'};
+struct_names = {'sylbs', 'sylb_trans', 'words', 'word_trans'};
 
-for f = 1:length(sylb_fields)
-    eval(sprintf('stats.sylbs.%s = sylb_data.%s;', sylb_fields{f}, sylb_fields{f}));
+for d = 1:length(datafiles)
+    data = load(datafiles{d});
+    fields = fieldnames(data);
+
+    for f = 1:length(fields)
+        eval(sprintf('stats.%s.%s = data.%s;', struct_names{d}, fields{f}, fields{f}));
+    end
+
 end

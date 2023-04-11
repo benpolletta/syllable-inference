@@ -20,18 +20,18 @@ end
 % likelihood = likelihood.likelihood;
 num_phones = length(phones);
 
-phones2timit = cellfun(@(x) strcmpi(x, phones), stats.id, 'unif', 0);
+phones2timit = cellfun(@(x) strcmpi(x, phones), stats.phones.id, 'unif', 0);
 phones2timit_mat = cat(2, phones2timit{:});
 
-trans2timit = cellfun(@(x) strcmpi(x, phones), stats.trans_phones, 'unif', 0);
+trans2timit = cellfun(@(x) strcmpi(x, phones), stats.phone_trans.phones, 'unif', 0);
 trans2timit_mat = cat(2, trans2timit{:});
-trans_prob = nanunitsum(trans2timit_mat*stats.trans_prob*trans2timit_mat');
+trans_prob = nanunitsum(trans2timit_mat*stats.phone_trans.prob*trans2timit_mat');
 
 [haz_est, haz_ent, transition, trans_posterior, inv_entropy] = deal(zeros(size(trans_likelihood)));
 phone_posterior = nan(size(phone_likelihood));
 hazard = nan(size(phones2timit_mat, 2), size(phone_likelihood, 2));
 
-phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.prob);
+phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.phones.prob);
 trans_posterior(1) = eps;
 
 trans_lookback = 10; % In timesteps.
@@ -129,8 +129,8 @@ function hazard = phone_hazard(duration) % (dist, duration)
 
 global stats
 
-[~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.cdf, 'unif', 0);
-hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index); 
+[~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.phones.cdf, 'unif', 0);
+hazard = cellfun(@(x, y) x(y, 2), stats.phones.cdf, cdf_index); 
 % duration_hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index);
 
 % hazard = sum(duration_hazard.*nanunitsum(dist));
@@ -143,8 +143,8 @@ global stats
 
 pdf = cellfun(@(x) [cumsum(x(:, 1) + diff([x(:, 1); x(end, 1)])/2), diff]);
 
-[~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.cdf, 'unif', 0);
-duration_hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index);
+[~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.phones.cdf, 'unif', 0);
+duration_hazard = cellfun(@(x, y) x(y, 2), stats.phones.cdf, cdf_index);
 
 hazard = sum(duration_hazard.*nanunitsum(dist));
 
