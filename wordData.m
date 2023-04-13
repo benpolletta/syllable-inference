@@ -143,9 +143,11 @@ phone_num_id = cellfun(@num2str, phone_num_id, 'unif', 0);
 %% Finding number of pronunciations per word, & distribution over pronunciations.
 
 %pron_map_cell = splitapply(@(x) {x}, pronunciation_vec_cell, word_index);
-pron_map = splitapply(@(x) {x}, pron_vec, word_index);
-[pronunciation_index, unique_pronunciations] = cellfun(@findgroups, pron_map, 'unif', 0);
+pronunciation_map = splitapply(@(x) {x}, pron_vec, canonical_word_index);
+[pronunciation_index, unique_pronunciations] = cellfun(@findgroups, pronunciation_map, 'unif', 0);
 num_pronunciations = cellfun(@length, unique_pronunciations);
+
+save('wordPronunciations.mat', 'pronunciation_map', 'pronunciation_index', 'unique_pronunciations', 'num_pronunciations')
 
 index = ones(size(num_pronunciations));
 id = {'Number of Pronunciations'};
