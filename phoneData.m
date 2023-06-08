@@ -149,7 +149,7 @@ for v = 1:length(vecs)
         
         plotProbability(prob, ids{i}, sort_option(i))
         
-        saveas(gcf, [fname, '.fig'])
+        saveas(gcf, [fname, '_prob.fig'])
         
         plotHistograms(fname, ids{i}(1:(end - no_skipped(i))), bin_centers(1:(end - no_skipped(i)), :)', hist(1:(end - no_skipped(i)), :)')
         
@@ -184,7 +184,7 @@ save([fname, '.mat'], 'id', 'count', 'prob', 'stats', 'cdf', 'hist', 'bins', 'bi
 
 end
 
-function plotProbability(prob, ids, sort_option)
+function plotProbability(prob, ids, sort_option, fname)
 
 if sort_option
     [prob, sort_order] = sort(prob, 'descend');
@@ -209,6 +209,8 @@ axis tight
 title('Phoneme Distribution')
 ylabel('Probability')
 
+%saveas(gcf, [fname, '_prob.fig'])
+
 end
 
 function plotIndividualizedHistograms(fname, id, bin_centers, hist)
@@ -232,7 +234,7 @@ axis tight
 
 title('Phoneme Duration Distribution')
 
-saveas(gcf, [fname, '_line.fig'])
+saveas(gcf, [fname, '_line_ind.fig'])
 
 end
 

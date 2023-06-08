@@ -283,7 +283,7 @@ axis tight
 
 title('Word Duration Distribution')
 
-saveas(gcf, [fname, '_line.fig'])
+saveas(gcf, [fname, '_line_ind.fig'])
 
 end
 
