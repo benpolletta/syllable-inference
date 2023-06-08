@@ -1,13 +1,15 @@
-function seqs = generate_sequences(current_seq, symbols, transition_matrix, n, cutoff)
+function seqs = generate_sequences(current_seq, symbols, transition_matrix, n, cutoff, length_function)
 % Generate all possible sequences of length n
 % starting from the given current sequence
 % using the given transition matrix.
 
 if nargin < 5, cutoff = []; end
 if isempty(cutoff), cutoff = 0; end
+if nargin < 6, length_function = []; end
+if isempty(length_function), length_function = @length; end
 
 % Check if current sequence is of length n
-if length(current_seq) == n
+if feval(length_function, current_seq) == n
     seqs = {current_seq}; % Return as a single sequence
     return
 end
