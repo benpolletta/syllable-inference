@@ -1,4 +1,4 @@
-function [sylb_posterior, vocalic_nuclei] = calc_syllable_posterior_parallel(sentence, vowel_likelihood, likelihood, method, tsylb_option, cutoff)
+function [sylb_posterior, vocalic_nuclei, top_candidates] = calc_syllable_posterior_parallel(sentence, vowel_likelihood, likelihood, method, tsylb_option, cutoff)
 
 if nargin < 4, method = ''; end
 if nargin < 5, tsylb_option = []; end
@@ -38,15 +38,17 @@ end
 
 %% Calculate posterior for each time.
 
-vocalic_nuclei = [];
+[onset, vocalic_nuclei] = deal([]);
 sylb_prior = nanunitsum(ones(size(sylbs)));
+hazards = nan(length(sylbs), length(likelihood.time));
+[haz_exp, haz_ent] = deal(nan(size(likelihood.time)));
 vn_i = 0;
 % [last_transition_index, last_posterior_index] = deal(1);
 
 for w = 1:length(time)
 
     %% Determining onset.
-    if trans_likelihood(w) > .9 && isempty(vocalic_nuclei)
+    if trans_likelihood(w) > .9 && isempty(onset)
 
         onset = time(w);
         continue
@@ -65,8 +67,8 @@ for w = 1:length(time)
     %% Determining presence of vocalic nucleus.
     bu_nucleus_flag = nucleus_onset(w) == 1 && nucleus_onset(w - 1) == 0;
 
-    [hazards, haz_exp, has_ent] = calc_hazard(sylb_prior(:, vn_i + 1), duration, method);
-    td_nucleus_flag = haz_exp > .6;
+    [hazards(:, w), haz_exp(w), haz_ent(w)] = calc_hazard(sylb_prior(:, vn_i + 1), duration, method);
+    td_nucleus_flag = haz_exp(w) > .6;
 
     if bu_nucleus_flag || td_nucleus_flag && vn_i > 0
 
@@ -81,64 +83,78 @@ for w = 1:length(time)
         end
 
         sylb_index = time >= sylb_start & time <= sylb_end;
-        trans_sequence = [0; diff(trans_likelihood(sylb_index) > .9) == 1];
-        trans_sequence([1, end]) = 1;
+        trans_indicator = diff([0; trans_likelihood(sylb_index) > .9]) == 1;
+        trans_indicator([1, end]) = 1;
+        trans_time = time(sylb_index == 1);
+        trans_times = trans_time(trans_indicator);
         this_sylb_likelihood = truncate_likelihood(likelihood, sylb_index);
 
         %% Getting candidate sequences of syllables.
         if vn_i == 1
             prev_candidate_sylbs = {};
         else
-            prev_candidate_sylbs = sylbs(sylb_posterior(:, vn_i + 1) > cutoff);
+            prev_candidate_sylbs = sylbs(sylb_posterior(:, vn_i - 1) > cutoff);
         end
 
         chunk_length = min(vn_i, 2);
         tic
         chunks = generate_sequences(prev_candidate_sylbs, sylbs, trans_matrix, chunk_length, cutoff);
         toc
-        chunk_likelihood = nan(size(chunks));
+        chunk_likelihood = zeros(size(chunks));
 
         % Turning syllables into sequences of phonemes.
         chunk_phones = cellfun(@(x) cellfun(@(y) split(y, '/'), x, 'unif', 0), chunks, 'unif', 0);
         chunk_phones = cellfun(@(x) cat(1, x{:}), chunk_phones, 'unif', 0);
         empty_phones = cellfun(@(x) cellfun(@isempty, x), chunk_phones, 'unif', 0);
         chunk_phones = cellfun(@(x,y) x(~y), chunk_phones, empty_phones, 'unif', 0);
-        chunk_phones(cellfun(@length, chunk_phones) == 0) = [];
+        empty_chunks = cellfun(@length, chunk_phones) == 0;
+        chunks(empty_chunks) = [];
+        chunk_phones(empty_chunks) = [];
 
         % Finding vocalic nuclei & truncating appropriately.
         vowel_indicators = cellfun(@(x) cellfun(@(y) any(strcmp(vowels, y)), x), chunk_phones, 'unif', 0);
         vowel_bounds = cellfun(@(x) find(diff([0; x]) == 1), vowel_indicators, 'unif', 0);
         no_vowels = cellfun(@isempty, vowel_bounds);
         consonantal_chunks = chunk_phones(no_vowels);
-        vowel_bounds(no_vowels) = cellfun(@length, consonantal_chunks) + 1;
+        vowel_bounds(no_vowels) = cellfun(@(x)length(x) + 1, consonantal_chunks, 'unif', 0);
         if vn_i == 1
-            phone_sequences = cellfun(@(x,y) x(1:(y(1) - 1)), chunk_phones, vowel_bounds, 'unif', 0);
+            phone_sequences = cellfun(@(x,y) x(1:max(y(1) - 1, 1)), chunk_phones, vowel_bounds, 'unif', 0);
         else
-            phone_sequences = cellfun(@(x,y) x(y(1):(y(2) - 1)), chunk_phones, vowel_bounds, 'unif', 0);
+            phone_sequences = cellfun(@(x,y) x(max(y(1), 1):max(y(2) - 1, 1)), chunk_phones, vowel_bounds, 'unif', 0);
         end
 
-        %% Calculating chunk likelihood.
+        %% Finding unique initial phone sequences.
+        %joined_sequences = cellfun(@(x) strjoin(x, '/'), phone_sequences, 'UniformOutput', 0);
+        [phone_seq_index, unique_phone_sequences] = findgroups(cellfun(@(x) strjoin(x, '/'), phone_sequences, 'UniformOutput', 0));
+        unique_phone_sequences = cellfun(@(x) strsplit(x, '/'), unique_phone_sequences, 'UniformOutput', 0);
+        ups_likelihood = zeros(size(unique_phone_sequences));
+
+        %% Calculating likelihood of unique initial phone sequences & translating to chunk-coordinates.
         tic
-        parfor c = 1:length(phone_sequences)
-            phone_sequence_likelihood = calc_phone_sequence_likelihood(this_sylb_likelihood, phone_sequences{c}, trans_sequence);
-            chunk_likelihood(c) = phone_sequence_likelihood.likelihood;
+        parfor ps = 1:length(unique_phone_sequences)
+            phone_sequence_likelihood = calc_phone_sequence_likelihood(this_sylb_likelihood, unique_phone_sequences{ps}, trans_times);
+            ups_likelihood(ps) = phone_sequence_likelihood.likelihood;
         end
         toc
+        chunk_likelihood = ups_likelihood(phone_seq_index);
 
         %% Calculating syllable likelihood from chunk likelihood.
         tic
         parfor s = 1:length(sylbs)
-            % Finding chunks ending with this syllable.
-            chunk_indicator = cellfun(@(x) strcmp(x{end}, sylbs{s}), chunks);
-            % Adding up those chunks.
-            sylb_likelihood(s, vn_i) = sum(chunk_likelihood(chunk_indicator));
+            for n = 1:chunk_length
+                % Finding chunks ending with this syllable.
+                chunk_indicator = cellfun(@(x) strcmp(x{n}, sylbs{s}), chunks);
+                % Adding up those chunks.
+                sl_from_cl(s, n) = sum(chunk_likelihood(chunk_indicator));
+            end
         end
         toc
+        sylb_likelihood(:, (vn_i - chunk_length + 1):vn_i) = flip(sl_from_cl, 2);
 
         %% Calculating sylb posterior distribution.
-        sylb_posterior(:, vn_i) = sylb_likelihood(:, vn_i).*sylb_prior(:, vn_i);
-        [~, i] = max(sylb_posterior, 'first', 10);
-        top_candidates{vn_i} = sylbs(i);
+        sylb_posterior(:, vn_i) = nanunitsum(sylb_likelihood(:, vn_i).*sylb_prior(:, vn_i));
+        [sorted_prob, sort_order] = sort(sylb_posterior(:, vn_i), 'descend');
+        top_candidates{vn_i} = sylbs(sort_order(1:10));
 
         %% Calculating next prior from this posterior.
         sylb_prior(:, vn_i + 1) = trans_matrix*sylb_posterior(:, vn_i);
@@ -149,7 +165,9 @@ for w = 1:length(time)
 
 end
 
-save(sprintf('sylbPosterior_%s.mat', datetime('now', 'Format', 'yy-MM-dd_HH-mm-ss')), 'sylb_posterior', 'top_candidates')
+save(sprintf('sylbPosterior_%s.mat', datetime('now', 'Format', 'yy-MM-dd_HH-mm-ss')),...
+    'sylb_posterior', 'top_candidates', 'sylb_likelihood', 'sylb_prior', 'hazards',...
+    'haz_exp', 'haz_ent')
 
 end
 
