@@ -64,3 +64,8 @@ for d = 1:length(datafiles)
     end
 
 end
+
+sylb_trunc_indicator = ones(size(stats.sylbs.id));
+sylb_trunc_indicator(1) = 0;
+stats.sylbs = truncate_struct(stats.sylbs, logical(sylb_trunc_indicator));
+stats.sylb_trans = truncate_struct(stats.sylb_trans, logical(sylb_trunc_indicator));
