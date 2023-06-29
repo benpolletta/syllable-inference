@@ -1,7 +1,4 @@
-function [t_count, prob] = wordTransitions(tsylb_option)
-
-if nargin < 2, tsylb_option = []; end
-if isempty(tsylb_option), tsylb_option = 0; end
+function [t_count, prob] = wordTransitions
 
 SI = (1:6300)/6300;
 
@@ -22,6 +19,7 @@ word_list = word_data.id;
 
 num_words = length(word_list);
 
+[w1_count, w2_count] = deal(zeros(num_words, 1));
 t_count = zeros(num_words);
 
 % phone2feature_data = load('phones2features.mat');
@@ -46,6 +44,8 @@ for s = 1:length(SI)
         
         this_index = find(strcmpi(word_list, words{w}));
         next_index = find(strcmpi(word_list, words{w + 1}));
+        w1_count(this_index) = w1_count(this_index) + 1;
+        w2_count(next_index) = w2_count(next_index) + 1;
         t_count(next_index, this_index) = t_count(next_index, this_index) + 1;
         
     end
@@ -59,15 +59,16 @@ num_transitions=sum(sum(t_count));
 fprintf('Number of transitions: %d.\n', num_transitions)
 
 prob = t_count/num_transitions;
-prob_rows = nanunitsum(t_count);
-prob_cols = nanunitsum(t_count')';
+w1_prob = w1_count/sum(w1_count);
+w2_prob = w2_count/sum(w2_count);
+t_prob = diag(1./w1_prob)*prob;
 
-save([name, '.mat'], 'word_list', 't_count', 'prob', 'prob_rows', 'prob_cols')
+save([name, '.mat'], 'word_list', 't_count', 'prob', 'w1_prob', 'w2_prob', 't_prob')
 
 
 plotTransitions([name, '_Counts'], 'Word Transition Counts', word_list, t_count)
 
-plotTransitions([name, '_Prob'], 'Word Transition Probabilities (col.)', word_list, nanunitsum(t_count), 'sqrt')
+plotTransitions([name, '_Prob'], 'Word Transition Probabilities (col.)', word_list, nanunitsum(t_count), 'exp')
 
 end
 
@@ -94,7 +95,11 @@ x = 1:length(units);
 [row, col, val] = find(transitions);
 
 if strcmp(scaling, 'sqrt')
-    sizes = sqrt(val); colors = sqrt(val);
+    sizes = sqrt(val); colors = val;
+elseif strcmp(scaling, 'log')
+    sizes = log(val); colors = val;
+elseif strcmp(scaling, 'exp')
+    sizes = 20.^val; colors = val;
 else
     sizes = val; colors = val;
 end

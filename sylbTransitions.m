@@ -1,7 +1,4 @@
-function [t_count, prob] = sylbTransitions(tsylb_option)
-
-if nargin < 2, tsylb_option = []; end
-if isempty(tsylb_option), tsylb_option = 0; end
+function [t_count, t_prob] = sylbTransitions
 
 SI = (1:6300)/6300;
 
@@ -22,6 +19,7 @@ sylb_list = sylb_data.id;
 
 num_sylbs = length(sylb_list);
 
+[s1_count, s2_count] = deal(zeros(num_sylbs, 1));
 t_count = zeros(num_sylbs);
 
 % phone2feature_data = load('phones2features.mat');
@@ -46,7 +44,9 @@ for s = 1:length(SI)
         
         this_index = find(strcmpi(sylb_list, syllables{syl}));
         next_index = find(strcmpi(sylb_list, syllables{syl + 1}));
-        t_count(next_index, this_index) = t_count(next_index, this_index) + 1;
+        s1_count(this_index) = s1_count(this_index) + 1;
+        s2_count(next_index) = s2_count(next_index) + 1;
+        t_count(this_index, next_index) = t_count(this_index, next_index) + 1;
         
     end
 
@@ -59,15 +59,17 @@ num_transitions=sum(sum(t_count));
 fprintf('Number of transitions: %d.\n', num_transitions)
 
 prob = t_count/num_transitions;
-prob_rows = nanunitsum(t_count);
-prob_cols = nanunitsum(t_count')';
+s1_prob = s1_count/sum(s1_count);
+s2_prob = s2_count/sum(s2_count);
+t_prob = diag(1./s1_prob)*prob;
+% prob_cols = nanunitsum(t_count);
+% prob_rows = nanunitsum(t_count')';
 
-save([name, '.mat'], 'sylb_list', 't_count', 'prob', 'prob_rows', 'prob_cols')
-
+save([name, '.mat'], 'sylb_list', 't_count', 'prob', 's1_prob', 's2_prob', 't_prob') %, 'prob_rows', 'prob_cols')
 
 plotTransitions([name, '_Counts'], 'Syllable Transition Counts', sylb_list, t_count)
 
-plotTransitions([name, '_Prob'], 'Syllable Transition Probabilities (col.)', sylb_list, nanunitsum(t_count), 'log')
+plotTransitions([name, '_Prob'], 'Syllable Transition Probabilities', sylb_list, t_prob, 'exp')
 
 end
 
@@ -94,11 +96,14 @@ x = 1:length(units);
 [row, col, val] = find(transitions);
 
 if strcmp(scaling, 'log')
-    sizes = log(val); colors = log(val);
+    sizes = log(val); colors = val;
+elseif strcmp(scaling, 'exp')
+    sizes = 20.^val; colors = val;
 else
     sizes = val; colors = val;
 end
 scatter(row, col, sizes, colors, 'filled', 'LineWidth', .25)
+axis tight
 
 %colormap('hot')
 
