@@ -11,7 +11,9 @@ global stats
 
 stats = loadStats(tsylb_option);
 sylbs = stats.sylbs.id;
-trans_matrix = stats.sylb_trans.prob_cols;
+probs = stats.sylbs.prob;
+trans_matrix = stats.sylb_trans.prob;
+trans_matrix = trans_matrix*diag(1./probs);
 
 [tsylb_phonemes, class_indicator, class_names] = getPhones(1);
 vowels = tsylb_phonemes(class_indicator(:, strcmpi(class_names, 'vowels')));
@@ -93,34 +95,24 @@ for w = 1:length(time)
         if vn_i == 1
             prev_candidate_sylbs = {};
         else
-            prev_candidate_sylbs = sylbs(sylb_posterior(:, vn_i - 1) > cutoff);
+            prev_candidate_sylbs.sylbs = sylbs(sylb_posterior(:, vn_i - 1) > cutoff);
         end
 
         chunk_length = min(vn_i, 2);
+        % length_function = @(x) get_vowel_onsets(x, vowels);
         tic
-        chunks = generate_sequences(prev_candidate_sylbs, sylbs, trans_matrix, chunk_length, cutoff);
+        chunk_structs = generate_sylb_sequences(prev_candidate_sylbs, sylbs, probs, trans_matrix, chunk_length, cutoff); %, @(x) get_vowel_onsets(x, vowels));
         toc
-        chunk_likelihood = zeros(size(chunks));
 
-        % Turning syllables into sequences of phonemes.
-        chunk_phones = cellfun(@(x) cellfun(@(y) split(y, '/'), x, 'unif', 0), chunks, 'unif', 0);
-        chunk_phones = cellfun(@(x) cat(1, x{:}), chunk_phones, 'unif', 0);
-        empty_phones = cellfun(@(x) cellfun(@isempty, x), chunk_phones, 'unif', 0);
-        chunk_phones = cellfun(@(x,y) x(~y), chunk_phones, empty_phones, 'unif', 0);
-        empty_chunks = cellfun(@length, chunk_phones) == 0;
-        chunks(empty_chunks) = [];
-        chunk_phones(empty_chunks) = [];
-
-        % Finding vocalic nuclei & truncating appropriately.
-        vowel_indicators = cellfun(@(x) cellfun(@(y) any(strcmp(vowels, y)), x), chunk_phones, 'unif', 0);
-        vowel_bounds = cellfun(@(x) find(diff([0; x]) == 1), vowel_indicators, 'unif', 0);
-        no_vowels = cellfun(@isempty, vowel_bounds);
-        consonantal_chunks = chunk_phones(no_vowels);
-        vowel_bounds(no_vowels) = cellfun(@(x)length(x) + 1, consonantal_chunks, 'unif', 0);
+        % Retrieving fields & truncating chunks appropriately.
+        chunks = cellfun(@(x) x.sylbs, chunk_structs, 'unif', 0);
+        chunk_phones = cellfun(@(x) x.phones, chunk_structs, 'unif', 0);
+        vowel_indicators = cellfun(@(x) x.vowel_indicator, chunk_structs, 'unif', 0);
+        vowel_onsets = cellfun(@(x) find(diff(x) == 1), vowel_indicators, 'unif', 0);
         if vn_i == 1
-            phone_sequences = cellfun(@(x,y) x(1:max(y(1) - 1, 1)), chunk_phones, vowel_bounds, 'unif', 0);
+            phone_sequences = cellfun(@(x,y) x(1:max(y(1) - 1, 1)), chunk_phones, vowel_onsets, 'unif', 0);
         else
-            phone_sequences = cellfun(@(x,y) x(max(y(1), 1):max(y(2) - 1, 1)), chunk_phones, vowel_bounds, 'unif', 0);
+            phone_sequences = cellfun(@(x,y) x(max(y(1), 1):max(y(2) - 1, 1)), chunk_phones, vowel_onsets, 'unif', 0);
         end
 
         %% Finding unique initial phone sequences.
@@ -141,7 +133,7 @@ for w = 1:length(time)
         %% Calculating syllable likelihood from chunk likelihood.
         tic
         parfor s = 1:length(sylbs)
-            for n = 1:chunk_length
+            for n = 1:chunk_length % This is a kludge to get likelihood over syllable sequences including intermediate syllables...
                 % Finding chunks ending with this syllable.
                 chunk_indicator = cellfun(@(x) strcmp(x{n}, sylbs{s}), chunks);
                 % Adding up those chunks.
@@ -170,6 +162,29 @@ save(sprintf('sylbPosterior_%s.mat', datetime('now', 'Format', 'yy-MM-dd_HH-mm-s
     'haz_exp', 'haz_ent')
 
 end
+
+% function [vowel_length, vowel_onsets, vowel_phones] = get_vowel_onsets(chunk, vowels)
+% 
+% % Turning syllables into sequences of phonemes.
+% phones = cellfun(@(y) split(y, '/'), chunk, 'unif', 0);
+% phones = cat(1, phones{:});
+% empty_phones = cellfun(@isempty, phones);
+% phones = phones(~empty_phones);
+% 
+% % Finding vocalic nuclei & getting length (in vocalic nuclei).
+% 
+% vowel_length = 0;
+% 
+% if length(phones) > 0
+% 
+%     vowel_indicators = strcmp(vowels, phones);
+%     vowel_bounds = find(diff([0; vowel_indicators]) == 1);
+% 
+%     vowel_length = length(vowel_bounds);
+% 
+% end
+% 
+% end
 
 function likelihood_out = truncate_likelihood(likelihood_in, index)
 
