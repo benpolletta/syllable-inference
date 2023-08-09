@@ -52,8 +52,8 @@ stats.phone_trans.sigma = sigma_t;
 
 %% Loading syllable & word data.
 
-datafiles = {'normSylbData.mat', 'sylbTransitions.mat', 'normWordCanonData.mat', 'wordTransitions.mat'};
-struct_names = {'sylbs', 'sylb_trans', 'words', 'word_trans'};
+datafiles = {'normSylbData.mat', 'sylbTransitions.mat', 'sylbDurationData_prob.mat', 'normWordCanonData.mat', 'wordTransitions.mat'};
+struct_names = {'sylbs', 'sylb_trans', 'sylb_dur', 'words', 'word_trans'};
 
 for d = 1:length(datafiles)
     data = load(datafiles{d});
