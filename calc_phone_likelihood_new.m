@@ -55,7 +55,7 @@ for w = 1:num_windows
     phone_tstat = squeeze(pagemtimes(mu_diff_pages, pagemldivide(sigma_f, pagetranspose(mu_diff_pages))));
     phone_stats(:, w) = tcdf(phone_tstat, window_length - 1, 'upper');
 
-    norm_phone_stats = nanunitsum(phone_stats(:, w));
+    norm_phone_stats = nanunitsum(phone_stats(:, w), [], 'uniform');
     inv_entropy(w) = (log(num_phones) + nansum(norm_phone_stats.*log(norm_phone_stats)))/num_phones;
 
     mu_f(:, w) = mean(this_feature_vec);

@@ -14,17 +14,17 @@ end
 % likelihood_data = likelihood;
 % likelihood = likelihood.likelihood;
 
-phones2timit = cellfun(@(x) strcmpi(x, phones), stats.id, 'unif', 0);
+phones2timit = cellfun(@(x) strcmpi(x, phones), stats.phones.id, 'unif', 0);
 phones2timit_mat = cat(2, phones2timit{:});
 
-trans2timit = cellfun(@(x) strcmpi(x, phones), stats.trans_phones, 'unif', 0);
+trans2timit = cellfun(@(x) strcmpi(x, phones), stats.phone_trans.prob, 'unif', 0);
 trans2timit_mat = cat(2, trans2timit{:});
-trans_prob = trans2timit_mat*stats.trans_prob*trans2timit_mat';
+trans_prob = trans2timit_mat*stats.phone_trans*trans2timit_mat';
 
 [hazard, transition, trans_posterior] = deal(zeros(size(trans_likelihood)));
 phone_posterior = nan(size(phone_likelihood));
 
-phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.prob);
+phone_posterior(:, 1) = phone_likelihood(:, 1).*(phones2timit_mat*stats.phones.prob);
 trans_posterior(1) = eps;
 
 last_transition = 0;
@@ -70,8 +70,8 @@ function hazard = phone_hazard(dist, duration)
 
 global stats
 
-[~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.cdf, 'unif', 0);
-duration_hazard = cellfun(@(x, y) x(y, 2), stats.cdf, cdf_index);
+[~, cdf_index] = cellfun(@(x) min(abs(x(:, 1) - duration)), stats.phones.cdf, 'unif', 0);
+duration_hazard = cellfun(@(x, y) x(y, 2), stats.phones.cdf, cdf_index);
 
 hazard = sum(duration_hazard.*nanunitsum(dist));
 

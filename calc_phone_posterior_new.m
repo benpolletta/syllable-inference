@@ -98,7 +98,7 @@ for w = 2:length(time)
 
     inv_entropy(w) = (log(num_phones) + nansum(phone_posterior(:, w).*log(phone_posterior(:, w))))/num_phones;
 
-    pt_dist(:, w) = nanunitsum([phone_posterior(:, w); trans_posterior(w)]);
+    pt_dist(:, w) = nanunitsum([phone_posterior(:, w); trans_posterior(w)], [], 'uniform');
 
     if trans_posterior(w) > 0.9
         
