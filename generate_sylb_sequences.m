@@ -3,7 +3,7 @@ function seqs = generate_sylb_sequences(current_seq, symbols, probs, transition_
 % starting from the given current sequence
 % using the given transition matrix.
 
-if isempty(current_seq), current_seq.sylbs = {}; current_seq.phones = {}; current_seq.vowel_indicator = []; current_seq.num_onsets = 0; end
+if isempty(current_seq), current_seq = struct('sylbs', {{}}, 'phones', {{}}, 'recur', 0, 'prob', 1, 'vowel_indicator', [], 'num_onsets', 0); end
 if nargin < 6, cutoff = []; end
 if isempty(cutoff), cutoff = 0; end
 if nargin < 7, save_opt = []; end
@@ -38,7 +38,7 @@ if isempty(current_seq.sylbs)
         % Recursive call to generate sequences with next sequence
         subseqs = generate_sylb_sequences(next_seq, symbols, probs, transition_matrix, n, cutoff);
         % Add generated sequences to current sequences
-        seqs = [seqs subseqs]; %#ok<AGROW>
+        seqs = [seqs; subseqs]; %#ok<AGROW>
     end
 else
     % Check which symbols can be appended to current sequence
@@ -62,7 +62,7 @@ else
         if next_seq.recur < max_recur % next_seq.prob^(1/next_seq.recur) > 10^-3
             subseqs = generate_sylb_sequences(next_seq, symbols, probs, transition_matrix, n, cutoff);
             % Add generated sequences to current sequences
-            seqs = [seqs subseqs]; %#ok<AGROW>
+            seqs = [seqs; subseqs]; %#ok<AGROW>
         else
             return
         end
