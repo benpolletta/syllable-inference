@@ -17,18 +17,21 @@ stats = loadStats(tsylb_option);
 
 time = likelihood.time;
 phone_likelihood = likelihood.phone_likelihood;
+phones = likelihood.phones;
 
-num_phones = length(phone_sequence);
+phones2timit = cellfun(@(x) strcmpi(x, phones), stats.phones.id, 'unif', 0);
+phones2timit_mat = cat(2, phones2timit{:});
 
-[lh_phones, prob_durations] = deal(ones(size(phone_sequence)));
+% [lh_phones, prob_durations] = deal(ones(size(phone_sequence)));
 duration_sequence = diff(transition_sequence);
 
 num_phones = length(phone_sequence);
 
-prob_indices = cellfun(@(x) find(strcmpi(stats.phones.id, x), 1), phone_sequence);
-trans_indices = cellfun(@(x) find(strcmpi(stats.phone_trans.phones, x), 1), phone_sequence);
+phone_indices = cellfun(@(x) find(strcmpi(phones, x), 1), phone_sequence);
+timit_indices = cellfun(@(x) find(strcmpi(stats.phones.id, x), 1), phone_sequence);
+% trans_indices = cellfun(@(x) find(strcmpi(stats.phone_trans.phones, x), 1), phone_sequence);
 
-cdf_sequence = stats.phones.cdf(prob_indices);
+cdf_sequence = stats.phones.cdf(timit_indices);
 [~, expected_duration_indices] = cellfun(@(x) min(abs(x(:, 2) - .5)), cdf_sequence, 'UniformOutput', false);
 expected_durations = cellfun(@(x, y) x(y), cdf_sequence, expected_duration_indices);
 
@@ -42,7 +45,7 @@ switch method
 
         evidence_intervals = arrayfun(@(i) time >= expected_transitions(i) & time < expected_transitions(i + 1), (1:num_phones)', 'UniformOutput', false);
         evidence_intervals = cell2mat(evidence_intervals);
-        phoneme_evidence = arrayfun(@(i) mean(phone_likelihood(prob_indices(i), evidence_intervals(i, :))), 1:num_phones);
+        phoneme_evidence = arrayfun(@(i) mean(phone_likelihood(phone_indices(i), evidence_intervals(i, :))), 1:num_phones);
 
         duration_prob = arrayfun(@(i) prob_duration(phone_sequence(i), expected_durations(i)), 1:num_phones);
 
@@ -116,7 +119,7 @@ end
 
 % prior = calc_phone_sequence_prior(phone_sequence);
 
-likelihood = prod(phoneme_evidence)*prod(duration_prob);
+likelihood = prod(phoneme_evidence(~isnan(phoneme_evidence)))*prod(duration_prob);
 
 results = struct('likelihood', likelihood, 'phoneme_evidence', phoneme_evidence, 'duration_prob', duration_prob);
     

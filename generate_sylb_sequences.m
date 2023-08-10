@@ -43,7 +43,7 @@ if isempty(current_seq.sylbs)
 else
     % Check which symbols can be appended to current sequence
     current_index = find(strcmp(symbols, current_seq.sylbs(end)));
-    possible_indices = find(transition_matrix(current_index, :) > cutoff);
+    possible_indices = find(transition_matrix(:, current_index) > cutoff);
     % fprintf('Possible indices: %d\n', length(possible_indices))
     for i = 1:length(possible_indices)
         % Get current symbol & length

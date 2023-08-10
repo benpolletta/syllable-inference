@@ -99,7 +99,7 @@ for w = 1:length(time)
         % length_function = @(x) get_vowel_onsets(x, vowels);
         [path_structs, path_priors] = deal(cell(size(prev_paths)));
         tic
-        parfor p = 1:min(10, length(prev_paths))
+        parfor p = 1:min(100, length(prev_paths))
             this_path = setfield(setfield(prev_paths{p}, 'recur', 0), 'prob', 1);
             path_structs{p} = generate_sylb_sequences(this_path, sylbs, probs, trans_matrix, path_length, cutoff); %, @(x) get_vowel_onsets(x, vowels));
             path_priors{p} = prev_paths{p}.prob*ones(size(path_structs{p}));
@@ -132,6 +132,7 @@ for w = 1:length(time)
         tic
         parfor ps = 1:length(unique_phone_sequences)
             phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{ps}, trans_times);
+            ups_likelihood_struct(ps) = phone_sequence_likelihood;
             ups_likelihood(ps) = phone_sequence_likelihood.likelihood;
         end
         toc
@@ -142,17 +143,17 @@ for w = 1:length(time)
         posterior_cell = mat2cell(path_posterior, ones(size(path_posterior, 1), 1), ones(size(path_posterior, 2), 1));
         path_structs = cellfun(@(x, y) setfield(x, 'prob', y), path_structs, posterior_cell, 'unif', 0);
         [sorted_prob, sort_order] = sort(path_posterior, 'descend');
-        top_paths{vn_i} = path_structs(sort_order(1:10));
+        top_paths{vn_i} = path_structs(sort_order(1:100));
 %         top_paths{vn_i} = cellfun(@(x) setfield(x, 'recur', 0), top_paths, 'unif', 0);
 %         top_paths{vn_i} = cellfun(@(x) setfield(x, 'prob', 1), top_paths, 'UniformOutput', 0);
-        prev_paths = top_paths{:};
+        prev_paths = top_paths{vn_i};
 
     end
 
 end
 
 save(sprintf('sylbPosterior_%s.mat', datetime('now', 'Format', 'yy-MM-dd_HH-mm-ss')),...
-    'path_posterior', 'top_candidates', 'candidate_paths', 'chunk_likelihood', 'chunk_prior', 'hazards',...
+    'path_posterior', 'top_paths', 'candidate_paths', 'chunk_likelihood', 'chunk_prior', 'hazards',...
     'haz_exp', 'haz_ent')
 
 end
