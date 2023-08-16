@@ -1,11 +1,17 @@
-function [path_posterior, vocalic_nuclei, top_candidates] = calc_syllable_path_posterior_parallel(sentence, vowel_likelihood, likelihood, method, tsylb_option, cutoff)
+function [path_posterior, vocalic_nuclei, top_candidates] = calc_syllable_path_posterior_parallel(sentence, vowel_likelihood, likelihood, method, tsylb_option, cutoff, debug_flag)
 
 if nargin < 4, method = ''; end
 if nargin < 5, tsylb_option = []; end
 if nargin < 6, cutoff = []; end
+if nargin < 7, debug_flag = []; end
 if isempty(method), method = 'non-syllable-specific'; end
 if isempty(tsylb_option), tsylb_option = 1; end
 if isempty(cutoff), cutoff = 0; end
+if isempty(debug_flag), debug_flag = false; end
+
+name_prefix = 'sylbPosterior';
+if debug_flag, name_prefix = 'sylbNOposterior'; end
+sim_name = sprintf('%s_%s_%s.mat', name_prefix, replace(sentence.filename, '/', '-'), datetime('now', 'Format', 'yy-MM-dd_HH-mm-ss'));
 
 global stats
 
@@ -93,15 +99,19 @@ for w = 1:length(time)
         %% Getting candidate sequences of syllables.
         if vn_i == 1 % Initializing empty paths.
             prev_paths = generate_sylb_sequences({}, sylbs, probs, trans_matrix, 0);
+            % prev_posterior = cellfun(@(x) x.prob, prev_paths);
         end
+        % likely_paths = find(prev_posterior >= cutoff);
 
-        path_length = vn_i;
+        min_path_vowel_onsets = vn_i;
+        max_chunk_sylbs = 3;
         % length_function = @(x) get_vowel_onsets(x, vowels);
         [path_structs, path_priors] = deal(cell(size(prev_paths)));
+        fprintf('\n Calculating continuations for %d paths.\n', length(prev_paths))
         tic
-        parfor p = 1:min(100, length(prev_paths))
+        parfor p = 1:length(prev_paths) % min(100, length(prev_paths))
             this_path = setfield(setfield(prev_paths{p}, 'recur', 0), 'prob', 1);
-            path_structs{p} = generate_sylb_sequences(this_path, sylbs, probs, trans_matrix, path_length, cutoff); %, @(x) get_vowel_onsets(x, vowels));
+            path_structs{p} = generate_sylb_sequences(this_path, sylbs, probs, trans_matrix, min_path_vowel_onsets, cutoff, max_chunk_sylbs); %, @(x) get_vowel_onsets(x, vowels));
             path_priors{p} = prev_paths{p}.prob*ones(size(path_structs{p}));
         end
         toc
@@ -129,11 +139,16 @@ for w = 1:length(time)
         ups_likelihood = zeros(size(unique_phone_sequences));
 
         % Calculating likelihood of unique initial phone sequences & translating to chunk-coordinates.
+        fprintf('\n Calculating likelihood for %d phone sequences.\n', length(ups_likelihood))
         tic
-        parfor ps = 1:length(unique_phone_sequences)
-            phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{ps}, trans_times);
-            ups_likelihood_struct(ps) = phone_sequence_likelihood;
-            ups_likelihood(ps) = phone_sequence_likelihood.likelihood;
+        if debug_flag
+            ups_likelihood = nanunitsum(exprnd(5*ones(size(ups_likelihood))));
+        else
+            parfor ps = 1:length(unique_phone_sequences)
+                phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{ps}, trans_times);
+                ups_likelihood_struct(ps) = phone_sequence_likelihood;
+                ups_likelihood(ps) = phone_sequence_likelihood.likelihood;
+            end
         end
         toc
         chunk_likelihood{vn_i} = ups_likelihood(phone_seq_index);
@@ -143,18 +158,41 @@ for w = 1:length(time)
         posterior_cell = mat2cell(path_posterior, ones(size(path_posterior, 1), 1), ones(size(path_posterior, 2), 1));
         path_structs = cellfun(@(x, y) setfield(x, 'prob', y), path_structs, posterior_cell, 'unif', 0);
         [sorted_prob, sort_order] = sort(path_posterior, 'descend');
-        top_paths{vn_i} = path_structs(sort_order(1:100));
+        top_index = find(sorted_prob == sorted_prob(1), 1, 'last');
+        cutoff_index = find(sorted_prob >= cutoff, 1, 'last');
+        if isempty(cutoff_index), cutoff_index = 0; end
+        if vn_i == 1
+            keep_index = max([100, top_index, cutoff_index]);
+        else
+            keep_index = max([10, top_index, cutoff_index]);
+        end
+        top_paths{vn_i} = path_structs(sort_order(1:keep_index));
 %         top_paths{vn_i} = cellfun(@(x) setfield(x, 'recur', 0), top_paths, 'unif', 0);
 %         top_paths{vn_i} = cellfun(@(x) setfield(x, 'prob', 1), top_paths, 'UniformOutput', 0);
         prev_paths = top_paths{vn_i};
+
+        if exist(sim_name, "file")
+            if debug_flag
+                save(sim_name, '-v7.3', '-append', 'top_paths')
+            else
+                save(sim_name, '-v7.3', '-append', 'top_paths', 'candidate_paths', 'chunk_likelihood', 'chunk_prior', 'hazards', 'haz_exp', 'haz_ent')
+            end
+
+        else
+            if debug_flag
+                save(sim_name, '-v7.3', 'top_paths')
+            else
+                save(sim_name, '-v7.3', 'top_paths', 'candidate_paths', 'chunk_likelihood', 'chunk_prior', 'hazards', 'haz_exp', 'haz_ent')
+            end
+
+        end
 
     end
 
 end
 
-save(sprintf('sylbPosterior_%s.mat', datetime('now', 'Format', 'yy-MM-dd_HH-mm-ss')),...
-    'path_posterior', 'top_paths', 'candidate_paths', 'chunk_likelihood', 'chunk_prior', 'hazards',...
-    'haz_exp', 'haz_ent')
+% save(sim_name, '-v7.3', 'path_posterior', 'top_paths', 'candidate_paths', 'chunk_likelihood', 'chunk_prior', 'hazards',...
+%     'haz_exp', 'haz_ent')
 
 end
 

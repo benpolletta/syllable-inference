@@ -1,4 +1,4 @@
-function seqs = generate_sylb_sequences(current_seq, symbols, probs, transition_matrix, n, cutoff, save_opt)
+function seqs = generate_sylb_sequences(current_seq, symbols, probs, transition_matrix, n, cutoff, max_recur, save_opt)
 % Generate all possible sequences of length n
 % starting from the given current sequence
 % using the given transition matrix.
@@ -6,9 +6,10 @@ function seqs = generate_sylb_sequences(current_seq, symbols, probs, transition_
 if isempty(current_seq), current_seq = struct('sylbs', {{}}, 'phones', {{}}, 'recur', 0, 'prob', 1, 'vowel_indicator', [], 'num_onsets', 0); end
 if nargin < 6, cutoff = []; end
 if isempty(cutoff), cutoff = 0; end
-if nargin < 7, save_opt = []; end
+if nargin < 7, max_recur = []; end
+if isempty(max_recur), max_recur = inf; end
+if nargin < 8, save_opt = []; end
 if isempty(save_opt), save_opt = 0; end
-max_recur = 3*n;
 
 [tsylb_phonemes, class_indicator, class_names] = getPhones(1);
 vowels = tsylb_phonemes(class_indicator(:, strcmpi(class_names, 'vowels')));
