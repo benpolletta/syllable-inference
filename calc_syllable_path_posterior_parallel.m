@@ -13,7 +13,7 @@ name_prefix = 'sylbPosterior';
 if debug_flag, name_prefix = 'sylbNOposterior'; end
 sim_name = sprintf('%s_%s_%s.mat', name_prefix, replace(sentence.filename, '/', '-'), datetime('now', 'Format', 'yy-MM-dd_HH-mm-ss'));
 
-global stats
+global stats vowels
 
 stats = loadStats(tsylb_option);
 sylbs = stats.sylbs.id;
@@ -43,6 +43,9 @@ for t = 1:length(nucleus_onset_times)
 end
 
 %% Get estimated syllable duration.
+
+mean_dur = stats.sylb_dur.stats(1); %.mean;
+var_dur = stats.sylb_dur.stats(2); %.var;
 
 %% Calculate posterior for each time.
 
@@ -89,6 +92,10 @@ for w = 1:length(time)
             sylb_start = vocalic_nuclei(vn_i - 1);
         end
 
+        % Estimating number of syllables.
+        abs_dur = sylb_end - sylb_start;
+        est_sylb_dur = ceil(abs_dur/(mean_dur - var_dur));
+
         sylb_index = time >= sylb_start & time <= sylb_end;
         trans_indicator = diff([0; trans_likelihood(sylb_index) > .9]) == 1;
         trans_indicator([1, end]) = 1;
@@ -98,20 +105,20 @@ for w = 1:length(time)
 
         %% Getting candidate sequences of syllables.
         if vn_i == 1 % Initializing empty paths.
-            prev_paths = generate_sylb_sequences({}, sylbs, probs, trans_matrix, 0);
+            prev_paths = generate_sylb_sequences({}, sylbs, probs, trans_matrix, vowels, 0);
             % prev_posterior = cellfun(@(x) x.prob, prev_paths);
         end
         % likely_paths = find(prev_posterior >= cutoff);
 
         min_path_vowel_onsets = vn_i;
-        max_chunk_sylbs = 3;
+        max_chunk_sylbs = max(3, est_sylb_dur);
         % length_function = @(x) get_vowel_onsets(x, vowels);
         [path_structs, path_priors] = deal(cell(size(prev_paths)));
         fprintf('\n Calculating continuations for %d paths.\n', length(prev_paths))
         tic
         parfor p = 1:length(prev_paths) % min(100, length(prev_paths))
             this_path = setfield(setfield(prev_paths{p}, 'recur', 0), 'prob', 1);
-            path_structs{p} = generate_sylb_sequences(this_path, sylbs, probs, trans_matrix, min_path_vowel_onsets, cutoff, max_chunk_sylbs); %, @(x) get_vowel_onsets(x, vowels));
+            path_structs{p} = generate_sylb_sequences(this_path, sylbs, probs, trans_matrix, vowels, min_path_vowel_onsets, cutoff, max_chunk_sylbs); %, @(x) get_vowel_onsets(x, vowels));
             path_priors{p} = prev_paths{p}.prob*ones(size(path_structs{p}));
         end
         toc
@@ -135,8 +142,8 @@ for w = 1:length(time)
         % Finding unique initial phone sequences.
         %joined_sequences = cellfun(@(x) strjoin(x, '/'), phone_sequences, 'UniformOutput', 0);
         [phone_seq_index, unique_phone_sequences] = findgroups(cellfun(@(x) strjoin(x, '/'), chunk_phones, 'UniformOutput', 0));
-        unique_phone_sequences = cellfun(@(x) strsplit(x, '/'), unique_phone_sequences, 'UniformOutput', 0);
-        ups_likelihood = zeros(size(unique_phone_sequences));
+        unique_phone_sequences{vn_i} = cellfun(@(x) strsplit(x, '/'), unique_phone_sequences, 'UniformOutput', 0);
+        ups_likelihood = zeros(size(unique_phone_sequences{vn_i}));
 
         % Calculating likelihood of unique initial phone sequences & translating to chunk-coordinates.
         fprintf('\n Calculating likelihood for %d phone sequences.\n', length(ups_likelihood))
@@ -144,9 +151,9 @@ for w = 1:length(time)
         if debug_flag
             ups_likelihood = nanunitsum(exprnd(5*ones(size(ups_likelihood))));
         else
-            parfor ps = 1:length(unique_phone_sequences)
-                phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{ps}, trans_times);
-                ups_likelihood_struct(ps) = phone_sequence_likelihood;
+            parfor ps = 1:length(unique_phone_sequences{vn_i})
+                phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{vn_i}{ps}, trans_times);
+                % ups_likelihood_struct(ps) = phone_sequence_likelihood;
                 ups_likelihood(ps) = phone_sequence_likelihood.likelihood;
             end
         end
