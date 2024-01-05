@@ -46,7 +46,7 @@ for s = 1:length(SI)
         next_index = find(strcmpi(sylb_list, syllables{syl + 1}));
         s1_count(this_index) = s1_count(this_index) + 1;
         s2_count(next_index) = s2_count(next_index) + 1;
-        t_count(this_index, next_index) = t_count(this_index, next_index) + 1;
+        t_count(next_index, this_index) = t_count(next_index, this_index) + 1;
         
     end
 
