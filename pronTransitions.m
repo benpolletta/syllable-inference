@@ -1,4 +1,4 @@
-function [pron_t_count, t_prob] = pronTransitions
+function [t_count, t_prob] = pronTransitions
 
 SI = (1:6300)/6300;
 
@@ -18,18 +18,18 @@ all_pron_list = cat(2, wsp_map.word_cell)';
 all_word_list = cat(1, wsp_map.canonical_word_cell);
 all_pair_list = cellfun(@(x, y) strjoin({x,y}, '='), all_word_list, all_pron_list, 'unif', 0);
 
-list = unique(all_pron_list);
-list(cellfun(@isempty, list)) = [];
-list{end + 1} = '#';
+pron_list = unique(all_pron_list);
+pron_list(cellfun(@isempty, pron_list)) = [];
+pron_list{end + 1} = '#';
 pair_list = unique(all_pair_list);
 pair_list{end + 1} = '#=#';
 
-num_prons = length(list);
+num_prons = length(pron_list);
 num_pairs = length(pair_list);
 
 [p1_count, p2_count] = deal(zeros(num_prons, 1));
 [wp1_count, wp2_count] = deal(zeros(num_pairs, 1));
-pron_t_count = zeros(num_prons);
+t_count = zeros(num_prons);
 pair_t_count = zeros(num_pairs);
 
 % phone2feature_data = load('phones2features.mat');
@@ -57,11 +57,11 @@ for s = 1:length(SI)
     
     for p = 1:(length(pairs) - 1)
         
-        this_index = find(strcmpi(list, prons{p}));
-        next_index = find(strcmpi(list, prons{p + 1}));
+        this_index = find(strcmpi(pron_list, prons{p}));
+        next_index = find(strcmpi(pron_list, prons{p + 1}));
         p1_count(this_index) = p1_count(this_index) + 1;
         p2_count(next_index) = p2_count(next_index) + 1;
-        pron_t_count(next_index, this_index) = pron_t_count(next_index, this_index) + 1;
+        t_count(next_index, this_index) = t_count(next_index, this_index) + 1;
         
         this_index = find(strcmpi(pair_list, pairs{p}));
         next_index = find(strcmpi(pair_list, pairs{p + 1}));
@@ -79,7 +79,7 @@ end
 num_transitions=sum(sum(pair_t_count));
 fprintf('Number of transitions: %d.\n', num_transitions)
 
-prob = pron_t_count/num_transitions;
+prob = t_count/num_transitions;
 first_prob = p1_count/sum(p1_count);
 second_prob = p2_count/sum(p2_count);
 t_prob = diag(1./first_prob)*prob;
@@ -89,11 +89,11 @@ wp1_prob = wp1_count/sum(wp1_count);
 wp2_prob = wp2_count/sum(wp2_count);
 pair_t_prob = diag(1./wp1_prob)*pair_prob;
 
-save([name, '.mat'], 'list', 'pron_t_count', 'prob', 'first_prob', 'second_prob', 't_prob', 'pair_list', 'pair_t_count', 'pair_prob', 'wp1_prob', 'wp2_prob', 'pair_t_prob')
+save([name, '.mat'], 'pron_list', 't_count', 'prob', 'first_prob', 'second_prob', 't_prob', 'pair_list', 'pair_t_count', 'pair_prob', 'wp1_prob', 'wp2_prob', 'pair_t_prob')
 
-plotTransitions([name, '_pronCounts'], 'Pronunciation Transition Counts', list, pron_t_count)
+plotTransitions([name, '_pronCounts'], 'Pronunciation Transition Counts', pron_list, t_count)
 
-plotTransitions([name, '_pronProb'], 'Pronunciation Transition Probabilities (col.)', list, t_prob, 'exp')
+plotTransitions([name, '_pronProb'], 'Pronunciation Transition Probabilities (col.)', pron_list, t_prob, 'exp')
 
 plotTransitions([name, '_pairCounts'], '(Word, Pron.) Pair Transition Counts', pair_list, pair_t_count)
 
