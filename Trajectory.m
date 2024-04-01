@@ -1,19 +1,10 @@
-classdef Sequence
+classdef Trajectory
 
     properties
 
-        Words cell
-        Sylbs cell
-        SylbList cell
-        Phones cell
-        vowelIndicator double
-        vowelOnsets double
-        PhoneList cell
-        PhoneDurations double
-        SylbDurations double
-        WordDurations double
-        TotalDuration double
-        SpeechRate double
+        time double
+        features cell
+        path double
 
     end
 
@@ -64,11 +55,11 @@ classdef Sequence
 
             end
 
-            obj = obj.updatePhoneDurations(PhoneDurations);
+            obj = obj.updateDurations(PhoneDurations);
 
         end
 
-        function obj = updatePhoneDurations(obj, PhoneDurations)
+        function obj = updateDurations(obj, PhoneDurations)
 
             % This code calculates durations of syllables as a cell of
             % vectors, w/ syllables in the same word grouped in the same
@@ -80,16 +71,7 @@ classdef Sequence
             % obj.Sylb_durations = cell2mat(obj.Sylb_durations);
             obj.WordDurations = cellfun(@(x) sum(obj.PhoneDurations(x(1):x(2))), obj.WordBoundaries);
             % obj.WordDurations = cell2mat(obj.WordDurations);
-            obj.TotalDuration = sum(obj.WordDurations);
-            obj.SpeechRate = nanmean(obj.SylbDurations);
-
-        end
-
-        function obj = updateTotalDuration(obj, TotalDuration)
-
-            obj.TotalDuration = TotalDuration;
-            normWordDurations = 
-            obj.WordDurations = 
+            obj.SpeechRate = nanmean(obj.WordDurations);
 
         end
 
@@ -119,6 +101,16 @@ classdef Sequence
             % obj.vowelLength = length(vowel_onsets);
 
         end
+
+%         function bounds = countsToBounds(counts)
+% 
+%             cumulative_sum = cumsum(counts);
+% 
+%             lower_bounds = [0 cumulative_sum(1:(end - 1))] + 1;
+%                 
+%             bounds = [lower_bounds; cumulative_sum];
+% 
+%         end
 
     end
 

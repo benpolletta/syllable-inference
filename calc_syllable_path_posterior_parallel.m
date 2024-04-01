@@ -46,6 +46,7 @@ end
 
 mean_dur = stats.sylb_dur.stats(1); %.mean;
 var_dur = stats.sylb_dur.stats(2); %.var;
+dur_dist = makedist('Normal', 'mu', mean_dur, 'sigma', var_dur);
 
 %% Calculate posterior for each time.
 
@@ -144,6 +145,7 @@ for w = 1:length(time)
         [phone_seq_index, unique_phone_sequences] = findgroups(cellfun(@(x) strjoin(x, '/'), chunk_phones, 'UniformOutput', 0));
         unique_phone_sequences{vn_i} = cellfun(@(x) strsplit(x, '/'), unique_phone_sequences, 'UniformOutput', 0);
         ups_likelihood = zeros(size(unique_phone_sequences{vn_i}));
+        ups_durations = cell(size(unique_phone_sequences));
 
         % Calculating likelihood of unique initial phone sequences & translating to chunk-coordinates.
         fprintf('\n Calculating likelihood for %d phone sequences.\n', length(ups_likelihood))
@@ -152,9 +154,10 @@ for w = 1:length(time)
             ups_likelihood = nanunitsum(exprnd(5*ones(size(ups_likelihood))));
         else
             parfor ps = 1:length(unique_phone_sequences{vn_i})
-                phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{vn_i}{ps}, trans_times);
+                phone_sequence_likelihood = calc_phone_sequence_likelihood(this_phone_likelihood, unique_phone_sequences{vn_i}{ps}, trans_times, dur_dist);
                 % ups_likelihood_struct(ps) = phone_sequence_likelihood;
                 ups_likelihood(ps) = phone_sequence_likelihood.likelihood;
+                ups_durations{ps} = phone_sequence_likelihood.expected_durations;
             end
         end
         toc
