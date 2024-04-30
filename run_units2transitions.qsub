@@ -1,0 +1,18 @@
+#!/bin/bash -l
+
+#$ -pe omp 32
+##$ -l h_rt=60:00:00
+
+#$ -N run_units2Transitions
+
+## Email me when done
+##$ -m ea
+
+# Join logfiles
+#$ -j y
+
+# Loading modules
+module load matlab/2023a
+
+# Running Matlab script.
+matlab -nosplash -nodisplay -r "cd /projectnb/crc-nak/brpp; startupSImodel; parpool(32); units2Transitions; exit"
