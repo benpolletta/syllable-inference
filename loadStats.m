@@ -76,3 +76,5 @@ data = load('units2Transitions.mat');
 transition_dicts = data.transition_dicts;
 stats.sylb2trans.dict = transition_dicts{2};
 stats.word2trans.dict = transition_dicts{1};
+
+save('stats.mat', 'stats')
