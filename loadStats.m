@@ -69,3 +69,10 @@ sylb_trunc_indicator = ones(size(stats.sylbs.id));
 sylb_trunc_indicator(1) = 0;
 stats.sylbs = truncate_struct(stats.sylbs, logical(sylb_trunc_indicator));
 stats.sylb_trans = truncate_struct(stats.sylb_trans, logical(sylb_trunc_indicator));
+
+%% Loading dictionaries of syllables and words as transition matrices.
+
+data = load('units2Transitions.mat');
+transition_dicts = data.transition_dicts;
+stats.sylb2trans.dict = transition_dicts{2};
+stats.word2trans.dict = transition_dicts{1};
