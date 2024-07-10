@@ -1,4 +1,4 @@
-function [phonemes, class_indicator, class_names] = getPhones(tsylb_option)
+function [phonemes, phone_encoding, phone_decoding, class_indicator, class_names] = getPhones(tsylb_option)
 
 if nargin == 0, tsylb_option = []; end
 if isempty(tsylb_option), tsylb_option = 0; end
@@ -104,4 +104,11 @@ if tsylb_option
     
 end
 
-save([phone_prefix, 'phones.mat'], 'phonemes', 'class_names', 'class_indicator')
+[phonemes, indices] = sort(phonemes); %(1:(end - 2)));
+phonemes2sorted = zeros(length(indices));
+phonemes2sorted(sub2ind([length(indices), length(indices)], cumsum(ones(size(indices))), indices)) = 1;
+phone_encoding = dictionary(phonemes, (1:length(phonemes))');
+phone_decoding = dictionary((1:length(phonemes))', phonemes);
+class_indicator = phonemes2sorted*class_indicator; %(1:(end - 2), :);
+
+save([phone_prefix, 'phones.mat'], 'phonemes', 'phone_encoding', 'phone_decoding', 'class_names', 'class_indicator')

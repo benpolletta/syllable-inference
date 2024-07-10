@@ -22,7 +22,7 @@ if length(SI) ~= 6300
     name = sprintf('%s_%dsentences', name, length(SI));
 end
 
-[phonemes, class_indicator, class_names] = getPhones(tsylb_option);
+[phonemes, phone_encoding, phone_decoding, class_indicator, class_names] = getPhones(tsylb_option);
 
 num_phones = length(phonemes);
 
@@ -60,7 +60,7 @@ for s = 1:length(SI)
     phone_data = reshape(phone_data, 3, length(phone_data)/3);
     
     phones = phone_data(3, :);
-    
+    encoded = phone_encoding(phones);
 %     phone_features = cell2mat(cellfun(@(x) phones2features(find(strcmpi(x, phone_list), 1), :), phones, 'unif', 0));
     
     transitions = cellfun(@(x, y) sprintf('%s2%s', x, y), phones(1:(end - 1)), phones(2:end), 'unif', 0);
@@ -69,9 +69,10 @@ for s = 1:length(SI)
     
     for p = 1:(length(phones) - 1)
         
-        this_index = find(strcmp(phonemes, phones{p}));
-        next_index = find(strcmp(phonemes, phones{p + 1}));
-        count(next_index, this_index) = count(next_index, this_index) + 1;
+        count(encoded(p + 1), encoded(p)) = count(encoded(p+1), encoded(p)) + 1;
+        % this_index = find(strcmp(phonemes, phones{p}));
+        % next_index = find(strcmp(phonemes, phones{p + 1}));
+        % count(next_index, this_index) = count(next_index, this_index) + 1;
         
     end
 
